@@ -1,14 +1,20 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {BottomTabBarProps} from '@react-navigation/bottom-tabs';
-import Svg, {Circle, Line, Path, Rect} from 'react-native-svg';
+import Svg, {
+  Defs,
+  LinearGradient,
+  Path,
+  Rect,
+  Stop,
+} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {useHaptics} from '../hooks/useHaptics';
 import {radius} from '../tokens/radius';
 import {shadows} from '../tokens/shadows';
 import {spacing} from '../tokens/spacing';
-import {fontFamilies, fontSizes} from '../tokens/typography';
+import {fontFamilies} from '../tokens/typography';
 import {useTheme} from '../theme/useTheme';
 
 const labels: Record<string, string> = {
@@ -28,8 +34,13 @@ function TabIcon({name, color}: TabIconProps) {
   if (name === 'Daily') {
     return (
       <Svg width={22} height={22} viewBox="0 0 24 24">
-        <Path d="M4 5.5C7 4.5 9.5 5 12 7v13c-2.5-2-5-2.5-8-1.5z" stroke={color} fill="none" strokeWidth={1.3} />
-        <Path d="M20 5.5C17 4.5 14.5 5 12 7v13c2.5-2 5-2.5 8-1.5z" stroke={color} fill="none" strokeWidth={1.3} />
+        <Path
+          d="M4 4h11a3 3 0 0 1 3 3v13l-4-2-4 2-3-2-3 2V4z"
+          stroke={color}
+          fill="none"
+          strokeWidth={1.3}
+        />
+        <Path d="M4 8h14" stroke={color} fill="none" strokeWidth={1.3} />
       </Svg>
     );
   }
@@ -46,8 +57,18 @@ function TabIcon({name, color}: TabIconProps) {
   if (name === 'Faraway') {
     return (
       <Svg width={22} height={22} viewBox="0 0 24 24">
-        <Circle cx={17.5} cy={6.5} r={2.5} stroke={color} fill="none" strokeWidth={1.3} />
-        <Path d="m2.5 19 6-9 4 5 2.5-3 6.5 7z" stroke={color} fill="none" strokeWidth={1.3} />
+        <Path
+          d="m3 19 5-7 4 5 3-4 6 6H3z"
+          stroke={color}
+          fill="none"
+          strokeWidth={1.3}
+        />
+        <Path
+          d="M18 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"
+          stroke={color}
+          fill="none"
+          strokeWidth={1.3}
+        />
       </Svg>
     );
   }
@@ -55,26 +76,42 @@ function TabIcon({name, color}: TabIconProps) {
   if (name === 'Profile') {
     return (
       <Svg width={22} height={22} viewBox="0 0 24 24">
-        <Rect x={4} y={3} width={16} height={18} rx={1.5} stroke={color} fill="none" strokeWidth={1.3} />
-        <Line x1={8} y1={8} x2={16} y2={8} stroke={color} strokeWidth={1.3} />
-        <Line x1={8} y1={12} x2={16} y2={12} stroke={color} strokeWidth={1.3} />
-        <Line x1={8} y1={16} x2={13} y2={16} stroke={color} strokeWidth={1.3} />
+        <Rect
+          x={6}
+          y={3}
+          width={12}
+          height={18}
+          rx={1}
+          stroke={color}
+          fill="none"
+          strokeWidth={1.3}
+        />
+        <Path d="M9 8h6M9 12h6M9 16h4" stroke={color} strokeWidth={1.3} />
       </Svg>
     );
   }
 
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24">
-      <Path d="M5 19c4-1 7-4 9-8l4-7c1 5-1 10-5 13-2 1.5-5 2-8 2Z" stroke={color} fill="none" strokeWidth={1.7} />
-      <Path d="m6 18 8-8" stroke={color} fill="none" strokeWidth={1.7} />
+    <Svg width={22} height={22} viewBox="0 0 24 24">
+      <Path
+        d="M12 3c-1 4-3 8-5 11l5-2 5 2c-2-3-4-7-5-11z"
+        stroke={color}
+        fill="none"
+        strokeWidth={1.8}
+      />
+      <Path d="M12 12v8" stroke={color} fill="none" strokeWidth={1.8} />
     </Svg>
   );
 }
 
 export function TabBar({state, descriptors, navigation}: BottomTabBarProps) {
-  const {colors} = useTheme();
+  const {colors, isDark} = useTheme();
   const insets = useSafeAreaInsets();
   const haptics = useHaptics();
+
+  if (state.routes[state.index].name === 'Write') {
+    return null;
+  }
 
   return (
     <View
@@ -87,6 +124,30 @@ export function TabBar({state, descriptors, navigation}: BottomTabBarProps) {
           borderTopColor: colors.line,
         },
       ]}>
+      <Svg
+        height="100%"
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        width="100%">
+        <Defs>
+          <LinearGradient id="tabPaper" x1="0" y1="0" x2="0" y2="1">
+            <Stop
+              offset="0"
+              stopColor={
+                isDark ? 'rgba(42,37,32,0.6)' : 'rgba(245,240,228,0.6)'
+              }
+            />
+            <Stop
+              offset="0.3"
+              stopColor={
+                isDark ? 'rgba(42,37,32,0.98)' : 'rgba(245,240,228,0.98)'
+              }
+            />
+            <Stop offset="1" stopColor={colors.tabBar} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#tabPaper)" />
+      </Svg>
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const isWrite = route.name === 'Write';
@@ -147,19 +208,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-around',
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 0.5,
     paddingTop: spacing.sm,
   },
   tab: {
     minWidth: 58,
     alignItems: 'center',
-    gap: spacing.xxs,
+    gap: 3,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
   label: {
     fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.caption,
+    fontSize: 10,
     letterSpacing: 1,
   },
   writeTab: {

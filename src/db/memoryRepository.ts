@@ -38,6 +38,7 @@ export async function getRecentMemories(limit = 20) {
     .get<Memory>('memories')
     .query(
       Q.where('deleted', false),
+      Q.where('is_future_letter', false),
       Q.sortBy('written_at', Q.desc),
       Q.take(limit),
     )

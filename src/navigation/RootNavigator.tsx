@@ -24,7 +24,7 @@ import {useTheme} from '../theme/useTheme';
 import {linking} from './linking';
 
 export type MainTabParamList = {
-  Daily: undefined;
+  Daily: {newMemoryId?: string} | undefined;
   Letters: undefined;
   Write: undefined;
   Faraway: undefined;

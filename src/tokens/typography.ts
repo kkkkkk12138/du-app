@@ -2,6 +2,11 @@ import {Platform} from 'react-native';
 
 export const fontFamilies = {
   serif: 'NotoSerifSC-Regular',
+  serifMedium: Platform.select({
+    ios: 'NotoSerifSC-Medium',
+    android: 'NotoSerifSC-Regular',
+    default: 'NotoSerifSC-Medium',
+  }),
   sans: Platform.select({
     ios: 'System',
     android: 'sans-serif',
