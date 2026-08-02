@@ -12,6 +12,7 @@ import { AppState } from 'react-native';
 import AudioRecord from 'react-native-audio-record';
 import Geolocation from 'react-native-geolocation-service';
 import { request } from 'react-native-permissions';
+import notifee from '@notifee/react-native';
 import App from '../App';
 import { createMemory } from '../src/db/memoryRepository';
 import { getDailyData } from '../src/features/daily/dailyRepository';
@@ -347,6 +348,41 @@ test('opens an archived letter and returns through the mailbox header', async ()
     tomorrowCount: 0,
   });
   getLetterDetailMock.mockRejectedValue(new Error('没有可拆的信'));
+});
+
+test('changes the arrival reminder time without requesting notification access', async () => {
+  const requestNotificationMock =
+    notifee.requestPermission as jest.MockedFunction<
+      typeof notifee.requestPermission
+    >;
+  requestNotificationMock.mockClear();
+  useSettingsStore.setState({letterReminderTime: '09:00'});
+
+  const renderer = await renderApp();
+  await completeOnboarding(renderer);
+  await ReactTestRenderer.act(() => {
+    renderer.root.findByProps({accessibilityLabel: '我'}).props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    renderer.root
+      .findByProps({accessibilityLabel: '新信提醒时间'})
+      .props.onPress();
+  });
+
+  const picker = renderer.root.findByProps({
+    accessibilityLabel: '信件在几点靠岸',
+  });
+  expect(picker.props.open).toBe(true);
+  await ReactTestRenderer.act(() => {
+    picker.props.onConfirm(new Date(2026, 7, 3, 18, 45));
+  });
+
+  expect(useSettingsStore.getState().letterReminderTime).toBe('18:45');
+  expect(requestNotificationMock).not.toHaveBeenCalled();
+
+  await ReactTestRenderer.act(() => {
+    renderer.unmount();
+  });
 });
 
 test('writes real content and keeps future letters out of Memory storage', async () => {

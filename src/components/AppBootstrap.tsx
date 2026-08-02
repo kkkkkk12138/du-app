@@ -35,6 +35,7 @@ export function AppBootstrap({children}: PropsWithChildren) {
       dailyReminderOn: settingsState.dailyReminderOn,
       dailyReminderTime: settingsState.dailyReminderTime,
       letterReminderOn: settingsState.letterReminderOn,
+      letterReminderTime: settingsState.letterReminderTime,
       biometricLockOn: settingsState.biometricLockOn,
       defaultCity: settingsState.defaultCity,
       onboardingCompleted: settingsState.onboardingCompleted,
@@ -46,6 +47,7 @@ export function AppBootstrap({children}: PropsWithChildren) {
       settingsState.dailyReminderTime,
       settingsState.defaultCity,
       settingsState.letterReminderOn,
+      settingsState.letterReminderTime,
       settingsState.onboardingCompleted,
       settingsState.privacyAcceptedAt,
       settingsState.themeMode,
@@ -102,7 +104,8 @@ export function AppBootstrap({children}: PropsWithChildren) {
               opacity: pressed ? 0.92 : 1,
               transform: [{scale: pressed ? 0.98 : 1}],
             },
-          ]}>
+          ]}
+        >
           <Text style={styles.retryText}>重试</Text>
         </Pressable>
       </View>

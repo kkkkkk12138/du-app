@@ -5,20 +5,40 @@ Updated: 2026-08-02
 ## Current Boundary
 
 - Project: `du-app`, React Native 0.86.
-- Last completed stage: Stage 3.
 - Stage 3 was accepted and committed as `9e678ac`.
-- Stage 4 is implemented in the working tree and awaiting user acceptance.
-- Stage 5 Letters and Unseal are implemented in the working tree and awaiting
-  user acceptance.
+- Stage 4 through Stage 6, the Daily memory detail redesign, and the opened
+  letter redesign were committed together as `f0f8697`.
+- The local branch is `main`; the working tree was clean immediately after
+  `f0f8697`.
+- New uncommitted work after `f0f8697` adds editable future-letter reminder
+  time in Profile and a WatermelonDB v1-to-v2 settings migration.
 - Daily memory detail and the opened-letter reading page have both been
   redesigned with the shared warm-paper visual language.
 - Daily replies are persisted once and now appear both in their parent memory
   thread and in the Letters `已拆` section.
 - The opened-letter header uses explicit source-tab navigation instead of
   relying on `goBack()`, preventing stale modal-stack and touch-layer failures.
-- Do not commit Stage 4 or Stage 5 without explicit user approval.
+- The user explicitly approved committing all completed changes. Future work
+  still requires a new commit; do not amend or rewrite `f0f8697`.
 - Preserve all existing working-tree changes. Do not reset, checkout, or revert
   files that were not created by the current task.
+
+## Remote Repository State
+
+- Configured remote:
+  `origin = https://github.com/kkkkkk12138/DU.git`
+- The remote repository is private and owned by the authorized GitHub account.
+- Remote `main` is currently `9235fd5` and contains the original HTML prototype.
+- Local `main` is `f0f8697` and contains the React Native history. The two
+  histories have no common ancestor.
+- The user chose to preserve the HTML prototype and merge the React Native
+  project into remote `main`. Do not force-push or delete the prototype.
+- The GitHub MCP connector has admin/push permission, but local HTTPS and SSH
+  Git credentials are unavailable. The connector cannot ingest local binary
+  files or a Git bundle, so the merge push is currently blocked.
+- When local GitHub credentials become available, fetch remote `main`, merge
+  with `--allow-unrelated-histories`, preserve all prototype files, resolve the
+  README collision intentionally, then push normally.
 
 ## Required Reading Order
 
@@ -193,15 +213,18 @@ and persisted content must come from real calculation or storage.
 - Local notification scheduling uses `@notifee/react-native`, requests
   permission only when the user seals a letter, and schedules in device-local
   time on the arrival date. Permission denial never blocks saving the letter.
-- Letter reminder time is persisted in settings with a `09:00` default, ready
-  for the settings UI to edit later.
+- Letter reminder time defaults to `09:00` and is editable from Profile through
+  a local-time picker. Editing it does not request notification permission;
+  permission remains deferred until the user seals a letter.
+- The setting persists in Zustand/AsyncStorage and the WatermelonDB settings
+  snapshot. Schema v2 adds `settings.letter_reminder_time`.
 - Daily now considers any arrived-but-unopened traveling/arrived letter and
   reloads after crossing a local calendar day, so in-app arrival nudges do not
   depend on notification permission.
 - Successful sealing resets the root navigation to Letters, destroying the
   already-sent Write draft while preserving it when the user simply goes back.
 
-Stage 6 verification currently completed:
+Stage 6 verification completed:
 
 - React Native autolinking discovers Notifee 9.1.8 and Date Picker 5.0.13 for
   both iOS and Android.
@@ -209,16 +232,13 @@ Stage 6 verification currently completed:
   time.
 - Repository tests cover linked Memory + Letter creation and persisted media
   metadata.
-- Jest: 6 suites and 21 tests pass; lint, TypeScript, and `git diff --check`
-  pass.
-
-Stage 6 native verification blocker:
-
-- Existing Pods do not yet contain Notifee or Date Picker.
-- The isolated CocoaPods 1.15.2 install under `/tmp` failed because
-  `rubygems.org/specs.4.8.gz` timed out. No global Ruby environment was changed.
-- Do not claim iOS notification/date-picker runtime verification until
-  `pod install` succeeds and the simulator flow is rerun.
+- Isolated CocoaPods 1.15.2 installation and `pod install` succeeded without
+  modifying the system Ruby environment.
+- Notifee and Date Picker are present in Pods and React Native codegen.
+- A real 10-second Notifee timestamp trigger was delivered in the iPhone 17 Pro
+  simulator with the title `有信到了`.
+- Date Picker's invalid TurboModule registration under the New Architecture is
+  fixed through `patch-package`.
 
 ## Latest Verification
 
@@ -233,12 +253,23 @@ pod install
 xcodebuild (iPhone 17 Pro simulator, Debug)
 ```
 
-Jest result:
+Latest Jest result:
 
 ```text
-4 suites passed
-16 tests passed
+10 suites passed
+35 tests passed
 ```
+
+Reminder-time migration verification:
+
+- An existing simulator database created under schema v1 was launched against
+  schema v2 without deleting app data.
+- SQLite `settings` gained `letter_reminder_time`; `local-settings` contained
+  the expected `09:00` value after bootstrap synchronization.
+- The app remained alive as process `54197` with no database, schema,
+  initialization, or fatal errors.
+- Integration coverage confirms choosing `18:45` updates the settings store and
+  does not call Notifee `requestPermission`.
 
 Stage 4 native verification:
 
@@ -279,6 +310,24 @@ Stage 5 simulator verification:
   simulator signature fixed it without personal certificates or credentials.
 - Reduced Motion still needs a manual simulator Settings or real-device pass.
 
+Latest detail and mailbox verification:
+
+- The Daily memory detail page follows
+  `/Users/bytedance/memory-detail-dev-spec.md`: full-screen warm paper, real
+  attachments, calendar header, reply thread, reply and stamp sheets, copy, and
+  CameraRoll export.
+- Memory replies are real hidden `Memory(type=reply)` records linked by
+  `Letter(status=reply)`. They remain in the parent Daily thread and also appear
+  under Letters `已拆`.
+- Letter list/detail resolution uses `replyMemoryId`, so opening a reply shows
+  its body rather than the parent Daily content.
+- The opened-letter view now uses the same warm-paper language and real photo,
+  audio, and handwriting components.
+- The source back control has an 88x48pt interaction area and explicitly
+  `popTo`s Daily or Letters. Integration tests cover returning to Letters.
+- Signed iOS Debug build succeeded and launched as process `41033`; startup logs
+  contained no fatal, module-resolution, or invariant errors.
+
 Known format constraint:
 
 - The recorder interface writes PCM/WAV on iOS and Android. The iOS native
@@ -303,26 +352,29 @@ Known format constraint:
 
 ## Next Task
 
-1. Preserve all current Stage 4, Stage 5, and Stage 6 working-tree changes.
-2. Wait for the user's replacement Daily detail prototype; keep the current
-   Daily and opened-letter detail views frozen.
-3. Retry isolated CocoaPods installation, run `pod install`, then verify the
-   complete Stage 6 save, notification permission, custom date picker, animation,
-   and traveling-letter flow in the iOS simulator.
-4. Manually verify Stage 5 and Stage 6 with Reduce Motion enabled.
-5. Perform a real-device pass for microphone recording and camera capture.
-6. Perform an Android Debug build when an isolated Android SDK is available.
-7. Decide with the user whether WAV is accepted or a recorder/transcoder change
+1. Continue from commit `f0f8697`; preserve any newer working-tree changes.
+2. Review and commit the uncommitted Profile reminder-time and schema-v2 work
+   only after user approval.
+3. Manually verify all detail and sealing animation paths with Reduce Motion
+   enabled.
+4. Perform a real-device pass for microphone recording and camera capture.
+5. Perform an Android Debug build when an isolated Android SDK is available.
+6. Decide with the user whether WAV is accepted or a recorder/transcoder change
    is authorized for M4A.
-8. Stop for user review before committing Stage 4, Stage 5, or Stage 6.
+7. Complete the non-force remote merge only after local GitHub credentials are
+   available. Preserve remote HTML prototype commit `9235fd5`.
 
 ## Suggested New-Task Prompt
 
 ```text
-继续开发 du-app。先完整读取 du-app/docs/SESSION_HANDOFF.md，并按其中的
-Required Reading Order 恢复上下文。保留当前所有未提交改动，不要 reset、
-checkout 或回退。Stage 4 已实现但尚未验收或提交；先检查 git status、diff、
-Stage 5 和 Stage 6 也已实现但尚未提交。当前 Daily 与原信详情页冻结，等待
-我的新原型；先检查 git status、diff、测试和原生构建记录，再向我简要复述
-当前边界。未经我明确确认，不要提交 Stage 4、Stage 5 或 Stage 6。
+继续开发 du-app。项目路径是
+/Users/bytedance/Library/Application Support/TRAE SOLO CN/ModularData/
+ai-agent/work-mode-projects/6a6df7fb35cb044b98197f4d/du-app。
+先完整读取 docs/SESSION_HANDOFF.md，并按 Required Reading Order 恢复上下文。
+保留所有现有改动，不要 reset、checkout、强推或回退。当前本地 main 为
+f0f8697；其后有未提交的提醒时间设置与 Schema v2 迁移改动，已通过 35 项
+测试并在保留旧数据的 iOS 模拟器验证迁移。Stage 4–6、Daily 详情和原信详情
+已提交。远端 main 为 9235fd5，保存 HTML 原型，和本地无共同历史；后续只能
+保留原型做正常合并，禁止 force push。先检查 git status、最近提交、测试和
+迁移记录，再继续当前待办。
 ```

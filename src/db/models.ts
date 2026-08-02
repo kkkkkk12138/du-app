@@ -79,6 +79,7 @@ export class Setting extends Model {
   @field('daily_reminder_on') dailyReminderOn!: boolean;
   @text('daily_reminder_time') dailyReminderTime!: string;
   @field('letter_reminder_on') letterReminderOn!: boolean;
+  @text('letter_reminder_time') letterReminderTime!: string;
   @field('biometric_lock_on') biometricLockOn!: boolean;
   @text('default_city') defaultCity!: string;
   @field('onboarding_completed') onboardingCompleted!: boolean;

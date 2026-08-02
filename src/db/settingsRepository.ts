@@ -9,6 +9,7 @@ export type SettingsSnapshot = {
   dailyReminderOn: boolean;
   dailyReminderTime: string;
   letterReminderOn: boolean;
+  letterReminderTime: string;
   biometricLockOn: boolean;
   defaultCity: string;
   onboardingCompleted: boolean;
@@ -32,6 +33,7 @@ export async function saveSettingsSnapshot(snapshot: SettingsSnapshot) {
       record.dailyReminderOn = snapshot.dailyReminderOn;
       record.dailyReminderTime = snapshot.dailyReminderTime;
       record.letterReminderOn = snapshot.letterReminderOn;
+      record.letterReminderTime = snapshot.letterReminderTime;
       record.biometricLockOn = snapshot.biometricLockOn;
       record.defaultCity = snapshot.defaultCity;
       record.onboardingCompleted = snapshot.onboardingCompleted;

@@ -26,10 +26,14 @@ async function getOrCreateAnonymousId() {
   }
 
   const anonymousId = randomId();
-  const saved = await Keychain.setGenericPassword('anonymous-user', anonymousId, {
-    service: keychainService,
-    accessible: Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-  });
+  const saved = await Keychain.setGenericPassword(
+    'anonymous-user',
+    anonymousId,
+    {
+      service: keychainService,
+      accessible: Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    },
+  );
 
   if (!saved) {
     throw new Error('无法将匿名身份写入系统安全存储');
@@ -90,6 +94,7 @@ async function ensureSettingsRecord(anonymousId: string) {
       settings.dailyReminderOn = false;
       settings.dailyReminderTime = '22:30';
       settings.letterReminderOn = true;
+      settings.letterReminderTime = '09:00';
       settings.biometricLockOn = false;
       settings.defaultCity = '上海';
       settings.onboardingCompleted = false;

@@ -1,7 +1,7 @@
 import {appSchema, tableSchema} from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 1,
+  version: 2,
   tables: [
     tableSchema({
       name: 'users',
@@ -81,6 +81,7 @@ export const schema = appSchema({
         {name: 'daily_reminder_on', type: 'boolean'},
         {name: 'daily_reminder_time', type: 'string'},
         {name: 'letter_reminder_on', type: 'boolean'},
+        {name: 'letter_reminder_time', type: 'string'},
         {name: 'biometric_lock_on', type: 'boolean'},
         {name: 'default_city', type: 'string'},
         {name: 'onboarding_completed', type: 'boolean'},

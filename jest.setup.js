@@ -123,6 +123,7 @@ jest.mock('react-native-date-picker', () => {
 
   return props =>
     React.createElement(View, {
+      ...props,
       accessibilityLabel: props.title || '日期选择器',
     });
 });

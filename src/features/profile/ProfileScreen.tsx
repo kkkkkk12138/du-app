@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import DatePicker from 'react-native-date-picker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
 
@@ -19,11 +20,8 @@ import {primitiveColors} from '../../tokens/colors';
 import {radius} from '../../tokens/radius';
 import {shadows} from '../../tokens/shadows';
 import {spacing} from '../../tokens/spacing';
-import {
-  fontFamilies,
-  fontSizes,
-  lineHeights,
-} from '../../tokens/typography';
+import {fontFamilies, fontSizes, lineHeights} from '../../tokens/typography';
+import {formatReminderTime, reminderTimeToDate} from './reminderTimeLogic';
 
 const themeOptions: Array<{label: string; value: ThemeMode}> = [
   {label: '跟随系统', value: 'system'},
@@ -33,18 +31,26 @@ const themeOptions: Array<{label: string; value: ThemeMode}> = [
 
 export function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const {colors, mode, setMode} = useTheme();
+  const {colors, isDark, mode, setMode} = useTheme();
   const toast = useToast();
   const haptics = useHaptics();
+  const [letterTimePickerOpen, setLetterTimePickerOpen] = useState(false);
   const duNumber = useSettingsStore(state => state.duNumber);
   const dailyReminderOn = useSettingsStore(state => state.dailyReminderOn);
+  const dailyReminderTime = useSettingsStore(state => state.dailyReminderTime);
   const letterReminderOn = useSettingsStore(state => state.letterReminderOn);
+  const letterReminderTime = useSettingsStore(
+    state => state.letterReminderTime,
+  );
   const defaultCity = useSettingsStore(state => state.defaultCity);
   const setDailyReminderOn = useSettingsStore(
     state => state.setDailyReminderOn,
   );
   const setLetterReminderOn = useSettingsStore(
     state => state.setLetterReminderOn,
+  );
+  const setLetterReminderTime = useSettingsStore(
+    state => state.setLetterReminderTime,
   );
 
   const selectMode = (nextMode: ThemeMode) => {
@@ -55,10 +61,12 @@ export function ProfileScreen() {
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
-      style={[styles.safeArea, {backgroundColor: colors.background}]}>
+      style={[styles.safeArea, {backgroundColor: colors.background}]}
+    >
       <ScrollView
         contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={[styles.eyebrow, {color: colors.textMuted}]}>渡 · DU</Text>
         <Text style={[styles.title, {color: colors.text}]}>我</Text>
 
@@ -67,13 +75,14 @@ export function ProfileScreen() {
             styles.identityCard,
             shadows.paper,
             {backgroundColor: colors.surface, borderColor: colors.line},
-          ]}>
+          ]}
+        >
           <View
-            style={[
-              styles.avatar,
-              {backgroundColor: primitiveColors.wood},
-            ]}>
-            <Text style={[styles.avatarText, {color: colors.textSoft}]}>渡</Text>
+            style={[styles.avatar, {backgroundColor: primitiveColors.wood}]}
+          >
+            <Text style={[styles.avatarText, {color: colors.textSoft}]}>
+              渡
+            </Text>
           </View>
           <View style={styles.identityText}>
             <Text style={[styles.nickname, {color: colors.text}]}>渡河人</Text>
@@ -95,7 +104,8 @@ export function ProfileScreen() {
                 opacity: pressed ? 0.92 : 1,
                 transform: [{scale: pressed ? 0.98 : 1}],
               },
-            ]}>
+            ]}
+          >
             <Text style={[styles.syncText, {color: colors.accent}]}>
               登录以同步
             </Text>
@@ -108,7 +118,8 @@ export function ProfileScreen() {
             styles.themeGroup,
             shadows.paper,
             {backgroundColor: colors.surface, borderColor: colors.line},
-          ]}>
+          ]}
+        >
           {themeOptions.map(option => {
             const selected = option.value === mode;
 
@@ -128,12 +139,14 @@ export function ProfileScreen() {
                     opacity: pressed ? 0.92 : 1,
                     transform: [{scale: pressed ? 0.98 : 1}],
                   },
-                ]}>
+                ]}
+              >
                 <Text
                   style={[
                     styles.themeOptionText,
                     {color: selected ? colors.accent : colors.textSoft},
-                  ]}>
+                  ]}
+                >
                   {option.label}
                 </Text>
               </Pressable>
@@ -147,10 +160,11 @@ export function ProfileScreen() {
             styles.list,
             shadows.paper,
             {backgroundColor: colors.surface, borderColor: colors.line},
-          ]}>
+          ]}
+        >
           <SettingsToggleRow
             label="每日提醒"
-            detail="22:30"
+            detail={dailyReminderTime}
             value={dailyReminderOn}
             onValueChange={value => {
               haptics.trigger('selection');
@@ -166,6 +180,12 @@ export function ProfileScreen() {
               haptics.trigger('selection');
               setLetterReminderOn(value);
             }}
+          />
+          <Divider />
+          <SettingsLinkRow
+            label="新信提醒时间"
+            detail={letterReminderTime}
+            onPress={() => setLetterTimePickerOpen(true)}
           />
           <Divider />
           <SettingsLinkRow
@@ -187,13 +207,33 @@ export function ProfileScreen() {
             styles.list,
             shadows.paper,
             {backgroundColor: colors.surface, borderColor: colors.line},
-          ]}>
+          ]}
+        >
           <SettingsLinkRow
             label="关于"
             onPress={() => navigation.navigate('About')}
           />
         </View>
       </ScrollView>
+      <DatePicker
+        modal
+        cancelText="取消"
+        confirmText="设为提醒时间"
+        date={reminderTimeToDate(letterReminderTime)}
+        locale="zh-CN"
+        mode="time"
+        onCancel={() => setLetterTimePickerOpen(false)}
+        onConfirm={date => {
+          const nextTime = formatReminderTime(date);
+          setLetterTimePickerOpen(false);
+          setLetterReminderTime(nextTime);
+          haptics.trigger('selection');
+          toast.show(`新寄出的信将在 ${nextTime} 提醒`);
+        }}
+        open={letterTimePickerOpen}
+        theme={isDark ? 'dark' : 'light'}
+        title="信件在几点靠岸"
+      />
     </SafeAreaView>
   );
 }
@@ -269,7 +309,8 @@ function SettingsLinkRow({
           opacity: pressed ? 0.92 : 1,
           transform: [{scale: pressed ? 0.98 : 1}],
         },
-      ]}>
+      ]}
+    >
       <Text style={[styles.rowLabel, {color: colors.text}]}>{label}</Text>
       <View style={styles.rowEnd}>
         {detail ? (
