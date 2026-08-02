@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000003 /* NotoSerifSC-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* NotoSerifSC-Regular.ttf */; };
+		A10000000000000000000001 /* CormorantGaramond-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* CormorantGaramond-Regular.ttf */; };
+		A10000000000000000000002 /* CormorantGaramond-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* CormorantGaramond-Italic.ttf */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -17,6 +20,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000000000000000000003 /* NotoSerifSC-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = NotoSerifSC-Regular.ttf; path = ../assets/fonts/NotoSerifSC-Regular.ttf; sourceTree = SOURCE_ROOT; };
+		B10000000000000000000001 /* CormorantGaramond-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = CormorantGaramond-Regular.ttf; path = ../assets/fonts/CormorantGaramond-Regular.ttf; sourceTree = SOURCE_ROOT; };
+		B10000000000000000000002 /* CormorantGaramond-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = CormorantGaramond-Italic.ttf; path = ../assets/fonts/CormorantGaramond-Italic.ttf; sourceTree = SOURCE_ROOT; };
 		13B07F961A680F5B00A75B9A /* duapp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = duapp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = duapp/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = duapp/Info.plist; sourceTree = "<group>"; };
@@ -46,6 +52,9 @@
 		13B07FAE1A68108700A75B9A /* duapp */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000003 /* NotoSerifSC-Regular.ttf */,
+				B10000000000000000000001 /* CormorantGaramond-Regular.ttf */,
+				B10000000000000000000002 /* CormorantGaramond-Italic.ttf */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
@@ -165,6 +174,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000003 /* NotoSerifSC-Regular.ttf in Resources */,
+				A10000000000000000000001 /* CormorantGaramond-Regular.ttf in Resources */,
+				A10000000000000000000002 /* CormorantGaramond-Italic.ttf in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				F8814D0058A043B28A8144BC /* BootSplash.storyboard in Resources */,

@@ -81,7 +81,7 @@ export function TabBar({state, descriptors, navigation}: BottomTabBarProps) {
       style={[
         styles.bar,
         {
-          height: 54 + Math.max(insets.bottom, spacing.sm),
+          height: spacing.tabBar,
           paddingBottom: Math.max(insets.bottom, spacing.sm),
           backgroundColor: colors.tabBar,
           borderTopColor: colors.line,
@@ -168,6 +168,6 @@ const styles = StyleSheet.create({
     minWidth: 48,
     justifyContent: 'center',
     borderRadius: radius.seal,
-    marginTop: -24,
+    marginTop: -16,
   },
 });

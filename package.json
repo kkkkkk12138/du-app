@@ -24,6 +24,7 @@
     "react-native-bootsplash": "^7.3.2",
     "react-native-gesture-handler": "^3.1.0",
     "react-native-haptic-feedback": "^3.0.0",
+    "react-native-keychain": "^10.0.0",
     "react-native-reanimated": "^4.5.3",
     "react-native-safe-area-context": "^5.8.0",
     "react-native-screens": "^4.26.2",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-proposal-decorators": "^7.28.0",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "20.1.0",

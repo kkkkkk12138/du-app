@@ -10,13 +10,13 @@ import {
   createBottomTabNavigator,
 } from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import BootSplash from 'react-native-bootsplash';
 
 import {TabBar} from '../components/TabBar';
 import {DailyScreen} from '../features/daily/DailyScreen';
 import {FarawayScreen} from '../features/faraway/FarawayScreen';
 import {LettersScreen} from '../features/letters/LettersScreen';
 import {NewLetterScreen} from '../features/newLetter/NewLetterScreen';
+import {AboutScreen} from '../features/profile/AboutScreen';
 import {ProfileScreen} from '../features/profile/ProfileScreen';
 import {UnsealScreen} from '../features/unseal/UnsealScreen';
 import {WriteScreen} from '../features/write/WriteScreen';
@@ -35,6 +35,7 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Unseal: {letterId?: string} | undefined;
   NewLetter: undefined;
+  About: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -78,7 +79,6 @@ export function RootNavigator() {
   return (
     <NavigationContainer
       linking={linking}
-      onReady={() => BootSplash.hide({fade: true})}
       theme={navigationTheme}>
       <Stack.Navigator
         initialRouteName="Main"
@@ -99,6 +99,7 @@ export function RootNavigator() {
           component={NewLetterScreen}
           options={{presentation: 'fullScreenModal'}}
         />
+        <Stack.Screen name="About" component={AboutScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
