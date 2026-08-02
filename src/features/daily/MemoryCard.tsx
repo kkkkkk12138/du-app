@@ -25,7 +25,9 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
+import {useToast} from '../../components/Toast';
 import {Memory} from '../../db/models';
+import {useAudioPlayback} from '../../hooks/useAudioPlayback';
 import {useHaptics} from '../../hooks/useHaptics';
 import {primitiveColors} from '../../tokens/colors';
 import {radius} from '../../tokens/radius';
@@ -75,6 +77,11 @@ const photoGradients: Record<string, [string, string, string]> = {
 };
 
 const waveHeights = [8, 14, 10, 18, 12, 16, 8, 22, 14, 10, 16, 8, 12, 6, 14, 10, 18];
+
+function formatDuration(seconds: number) {
+  const rounded = Math.max(0, Math.ceil(seconds));
+  return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}`;
+}
 
 function MemoryPressable({
   children,
@@ -130,6 +137,41 @@ function Tags({tags}: {tags: string[]}) {
           </Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+function AttachmentPreview({memory}: {memory: Memory}) {
+  const {colors} = useTheme();
+  const inkSource = memory.inkImagePath
+    ? {
+        uri: memory.inkImagePath.startsWith('file://')
+          ? memory.inkImagePath
+          : `file://${memory.inkImagePath}`,
+      }
+    : undefined;
+
+  if (!inkSource) {
+    return null;
+  }
+
+  return (
+    <View style={styles.attachmentPreview}>
+      <View
+        style={[
+          styles.inkPreviewCard,
+          {backgroundColor: colors.surfaceWarm, borderColor: colors.line},
+        ]}>
+        <Text style={[styles.inkPreviewLabel, {color: colors.accent}]}>
+          手书
+        </Text>
+        <Image
+          accessibilityLabel="手书缩略图"
+          resizeMode="contain"
+          source={inkSource}
+          style={styles.inkPreviewImage}
+        />
+      </View>
     </View>
   );
 }
@@ -281,30 +323,27 @@ function AudioMemoryCard({
   onPress: () => void;
 }) {
   const haptics = useHaptics();
+  const toast = useToast();
   const tags = parseMemoryTags(memory.customTags);
   const totalDuration = Math.max(1, Math.round(memory.audioDuration ?? 12));
-  const [remaining, setRemaining] = useState(totalDuration);
-  const [playing, setPlaying] = useState(false);
   const [waveTick, setWaveTick] = useState(0);
+  const playback = useAudioPlayback({
+    path: memory.audioPath,
+    fallbackDuration: totalDuration,
+    onError: toast.show,
+  });
 
   useEffect(() => {
-    if (!playing) {
+    if (!playback.playing) {
       return;
     }
 
     const timer = setInterval(() => {
       setWaveTick(value => value + 1);
-      setRemaining(value => {
-        if (value <= 1) {
-          setPlaying(false);
-          return totalDuration;
-        }
-        return value - 1;
-      });
-    }, 1000);
+    }, 150);
 
     return () => clearInterval(timer);
-  }, [playing, totalDuration]);
+  }, [playback.playing]);
 
   return (
     <MemoryPressable
@@ -322,20 +361,25 @@ function AudioMemoryCard({
         <View style={styles.audioControls}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={playing ? '暂停音频预览' : '播放音频预览'}
+            accessibilityLabel={
+              playback.playing ? '暂停录音' : '播放录音'
+            }
+            disabled={playback.loading}
             onPress={() => {
               haptics.trigger('selection');
-              setPlaying(value => !value);
+              playback.toggle();
             }}
             style={({pressed}) => [
               styles.playButton,
-              {opacity: pressed ? 0.8 : 1},
+              {opacity: playback.loading ? 0.45 : pressed ? 0.8 : 1},
             ]}>
-            <Text style={styles.playIcon}>{playing ? 'Ⅱ' : '▶'}</Text>
+            <Text style={styles.playIcon}>
+              {playback.loading ? '···' : playback.playing ? 'Ⅱ' : '▶'}
+            </Text>
           </Pressable>
           <View style={styles.wave}>
             {waveHeights.map((height, index) => {
-              const animatedHeight = playing
+              const animatedHeight = playback.playing
                 ? 6 + ((height + waveTick * (index + 3)) % 17)
                 : height;
               return (
@@ -351,7 +395,7 @@ function AudioMemoryCard({
             })}
           </View>
           <Text style={styles.audioDuration}>
-            0:{String(remaining).padStart(2, '0')}
+            {formatDuration(playback.remaining)}
           </Text>
         </View>
         <View style={styles.audioTags}>
@@ -361,6 +405,7 @@ function AudioMemoryCard({
             </View>
           ))}
         </View>
+        {memory.inkImagePath ? <AttachmentPreview memory={memory} /> : null}
       </View>
     </MemoryPressable>
   );
@@ -440,6 +485,7 @@ export function MemoryCard({
             {memory.placeDetail ? ` · ${memory.placeDetail}` : ''}
             {tags[0] ? ` · ${tags[0]}` : ''}
           </Text>
+          <AttachmentPreview memory={memory} />
         </MemoryPressable>
       </Animated.View>
     );
@@ -483,6 +529,7 @@ export function MemoryCard({
           <Text style={[styles.oldText, {color: colors.textSoft}]}>
             {memory.content}
           </Text>
+          <AttachmentPreview memory={memory} />
           <View style={styles.oldFooter}>
             <Text style={[styles.oldDate, {color: colors.textFaint}]}>
               {formatMemoryDate(memory.writtenAt)}
@@ -516,6 +563,7 @@ export function MemoryCard({
             <Text style={[styles.anchorText, {color: colors.text}]}>
               {memory.content}
             </Text>
+            <AttachmentPreview memory={memory} />
             <View style={styles.anchorFooter}>
               <View style={styles.anchorMetaLine} />
               <Text style={[styles.anchorMeta, {color: colors.textMuted}]}>
@@ -552,6 +600,7 @@ export function MemoryCard({
             ]}>
             {memory.content}
           </Text>
+          {memory.inkImagePath ? <AttachmentPreview memory={memory} /> : null}
           {isSpringPhoto ? (
             <View style={[styles.photoFooter, {borderTopColor: colors.line}]}>
               {tags.slice(0, 2).map(tag => (
@@ -612,6 +661,7 @@ export function MemoryCard({
         <Text style={[styles.textBody, {color: colors.text}]}>
           {memory.content}
         </Text>
+        <AttachmentPreview memory={memory} />
         <Tags tags={tags} />
       </MemoryPressable>
     </Animated.View>
@@ -657,6 +707,29 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 10,
     letterSpacing: 0.2,
+  },
+  attachmentPreview: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  inkPreviewCard: {
+    height: 104,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    borderWidth: 0.5,
+    borderRadius: radius.image,
+    overflow: 'hidden',
+  },
+  inkPreviewLabel: {
+    alignSelf: 'flex-start',
+    fontFamily: fontFamilies.sans,
+    fontSize: 9,
+    letterSpacing: 1.8,
+  },
+  inkPreviewImage: {
+    width: '100%',
+    flex: 1,
   },
   photoCard: {
     marginHorizontal: spacing.page,

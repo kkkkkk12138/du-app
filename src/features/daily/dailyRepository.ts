@@ -21,7 +21,10 @@ export async function getDailyData(now = new Date()): Promise<DailyData> {
     database
       .get<Letter>('letters')
       .query(
-        Q.where('status', Q.oneOf(['arriving', 'arrived'])),
+        Q.where(
+          'status',
+          Q.oneOf(['traveling', 'arriving', 'arrived']),
+        ),
         Q.where('arrive_date', Q.lte(now.getTime())),
         Q.sortBy('arrive_date', Q.desc),
         Q.take(1),
@@ -29,10 +32,7 @@ export async function getDailyData(now = new Date()): Promise<DailyData> {
       .fetch(),
   ]);
 
-  const letter = letters.find(item => {
-    const elapsed = now.getTime() - item.arriveDate.getTime();
-    return elapsed >= 0 && elapsed <= 86_400_000;
-  });
+  const letter = letters[0];
   if (!letter) {
     return {memories, arrivedLetter: null};
   }

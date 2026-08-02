@@ -12,6 +12,7 @@ type SettingsState = {
   dailyReminderOn: boolean;
   dailyReminderTime: string;
   letterReminderOn: boolean;
+  letterReminderTime: string;
   biometricLockOn: boolean;
   defaultCity: string;
   onboardingCompleted: boolean;
@@ -22,6 +23,7 @@ type SettingsState = {
   setDailyReminderOn: (enabled: boolean) => void;
   setDailyReminderTime: (time: string) => void;
   setLetterReminderOn: (enabled: boolean) => void;
+  setLetterReminderTime: (time: string) => void;
   setBiometricLockOn: (enabled: boolean) => void;
   setDefaultCity: (city: string) => void;
   completeOnboarding: () => void;
@@ -37,6 +39,7 @@ export const useSettingsStore = create<SettingsState>()(
       dailyReminderOn: false,
       dailyReminderTime: '22:30',
       letterReminderOn: true,
+      letterReminderTime: '09:00',
       biometricLockOn: false,
       defaultCity: '上海',
       onboardingCompleted: false,
@@ -47,6 +50,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDailyReminderOn: dailyReminderOn => set({dailyReminderOn}),
       setDailyReminderTime: dailyReminderTime => set({dailyReminderTime}),
       setLetterReminderOn: letterReminderOn => set({letterReminderOn}),
+      setLetterReminderTime: letterReminderTime => set({letterReminderTime}),
       setBiometricLockOn: biometricLockOn => set({biometricLockOn}),
       setDefaultCity: defaultCity => set({defaultCity}),
       completeOnboarding: () =>
@@ -63,6 +67,7 @@ export const useSettingsStore = create<SettingsState>()(
         dailyReminderOn: state.dailyReminderOn,
         dailyReminderTime: state.dailyReminderTime,
         letterReminderOn: state.letterReminderOn,
+        letterReminderTime: state.letterReminderTime,
         biometricLockOn: state.biometricLockOn,
         defaultCity: state.defaultCity,
         onboardingCompleted: state.onboardingCompleted,

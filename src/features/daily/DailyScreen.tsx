@@ -26,7 +26,6 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-import {useToast} from '../../components/Toast';
 import {Memory} from '../../db/models';
 import {useHaptics} from '../../hooks/useHaptics';
 import {
@@ -51,6 +50,7 @@ import {
 } from './dailyContext';
 import {ArrivedLetter, getDailyData} from './dailyRepository';
 import {MemoryCard} from './MemoryCard';
+import {MemoryDetailModal} from './MemoryDetailModal';
 import {useDailyClock} from './useDailyClock';
 
 type DailyNavigation = CompositeNavigationProp<
@@ -172,7 +172,6 @@ export function DailyScreen() {
   const navigation = useNavigation<DailyNavigation>();
   const route = useRoute<DailyRoute>();
   const {colors, isDark} = useTheme();
-  const toast = useToast();
   const haptics = useHaptics();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [arrivedLetter, setArrivedLetter] = useState<ArrivedLetter | null>(null);
@@ -182,7 +181,11 @@ export function DailyScreen() {
     route.params?.newMemoryId,
   );
   const [freshnessNow, setFreshnessNow] = useState(() => Date.now());
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const now = useDailyClock();
+  const loadedDay = useRef(
+    `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`,
+  );
   const context = useMemo(() => getDailyContext(now), [now]);
 
   useEffect(() => {
@@ -216,6 +219,15 @@ export function DailyScreen() {
       load();
     }, [load]),
   );
+
+  useEffect(() => {
+    const currentDay = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    if (currentDay === loadedDay.current) {
+      return;
+    }
+    loadedDay.current = currentDay;
+    load();
+  }, [load, now]);
 
   const oldMemory = useMemo(() => {
     const monthAgo = now.getTime() - 30 * 86_400_000;
@@ -300,9 +312,9 @@ export function DailyScreen() {
     return summaries;
   }, [memories]);
 
-  const openMemory = useCallback(() => {
-    toast.show('此刻已翻开');
-  }, [toast]);
+  const openMemory = useCallback((memory: Memory) => {
+    setSelectedMemory(memory);
+  }, []);
   const renderMemory = useCallback(
     ({item}: {item: Memory}) => {
       const tags = parseMemoryTags(item.customTags);
@@ -320,7 +332,7 @@ export function DailyScreen() {
           anchorSummary={anchorSummaries.get(item.id)}
           oldReason={isContextualOld ? '也是一个人吃饭' : undefined}
           variant={isContextualOld ? 'old' : undefined}
-          onPress={openMemory}
+          onPress={() => openMemory(item)}
         />
       );
     },
@@ -400,6 +412,7 @@ export function DailyScreen() {
           onOpen={() =>
             navigation.navigate('Unseal', {
               letterId: arrivedLetter.letter.id,
+              source: 'daily',
             })
           }
         />
@@ -410,7 +423,7 @@ export function DailyScreen() {
           memory={oldMemory}
           oldReason={getSimilarityReason(oldMemory.writtenAt, now)}
           variant="old"
-          onPress={() => toast.show('翻开旧忆')}
+          onPress={() => openMemory(oldMemory)}
         />
       ) : null}
 
@@ -469,6 +482,10 @@ export function DailyScreen() {
         }
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
+      />
+      <MemoryDetailModal
+        memory={selectedMemory}
+        onDismiss={() => setSelectedMemory(null)}
       />
     </SafeAreaView>
   );

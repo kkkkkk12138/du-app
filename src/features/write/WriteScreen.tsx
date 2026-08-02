@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import {
   AppState,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -34,10 +35,13 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import Geolocation from 'react-native-geolocation-service';
 import Svg, {
   Circle,
   Defs,
@@ -50,16 +54,24 @@ import Svg, {
 
 import {useToast} from '../../components/Toast';
 import {createMemory} from '../../db/memoryRepository';
+import {
+  AudioAttachment,
+  useAudioRecorder,
+} from '../../hooks/useAudioRecorder';
 import {useHaptics} from '../../hooks/useHaptics';
 import {
   MainTabParamList,
   RootStackParamList,
 } from '../../navigation/RootNavigator';
 import {primitiveColors} from '../../tokens/colors';
+import {requestCameraAccess, requestLocationAccess} from '../../services/contextPermissions';
+import {removeMediaFile} from '../../services/mediaStorage';
 import {radius} from '../../tokens/radius';
 import {spacing} from '../../tokens/spacing';
 import {fontFamilies} from '../../tokens/typography';
 import {useTheme} from '../../theme/useTheme';
+import {CameraOverlay} from './CameraOverlay';
+import {HandwritingOverlay} from './HandwritingOverlay';
 
 type WriteNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Write'>,
@@ -161,6 +173,11 @@ function formatDates(now: Date) {
   };
 }
 
+function formatDuration(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 function PaperBackground({isDark}: {isDark: boolean}) {
   return (
     <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
@@ -222,6 +239,95 @@ function ToolIcon({name, color}: {name: string; color: string}) {
   );
 }
 
+function AttachmentEnter({children}: {children: React.ReactNode}) {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(reduceMotion ? 1 : 0);
+
+  useEffect(() => {
+    progress.value = reduceMotion
+      ? withTiming(1, {duration: 150})
+      : withSpring(1, {damping: 14, stiffness: 180});
+  }, [progress, reduceMotion]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: reduceMotion ? [] : [{scale: 0.8 + progress.value * 0.2}],
+  }));
+
+  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+}
+
+function RecordingBar({
+  seconds,
+  waveLevels,
+  onCancel,
+  onComplete,
+}: {
+  seconds: number;
+  waveLevels: number[];
+  onCancel: () => void;
+  onComplete: () => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  const entry = useSharedValue(reduceMotion ? 1 : 0);
+  const pulse = useSharedValue(1);
+
+  useEffect(() => {
+    entry.value = reduceMotion
+      ? withTiming(1, {duration: 150})
+      : withSpring(1, {damping: 18, stiffness: 190});
+    if (!reduceMotion) {
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(0.38, {duration: 500}),
+          withTiming(1, {duration: 500}),
+        ),
+        -1,
+        false,
+      );
+    }
+  }, [entry, pulse, reduceMotion]);
+
+  const barStyle = useAnimatedStyle(() => ({
+    opacity: entry.value,
+    transform: reduceMotion ? [] : [{translateY: 44 * (1 - entry.value)}],
+  }));
+  const dotStyle = useAnimatedStyle(() => ({
+    opacity: pulse.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.recordingBar, barStyle]}>
+      <Animated.View style={[styles.recordingDot, dotStyle]} />
+      <View style={styles.recordingWave}>
+        {waveLevels.map((level, index) => (
+          <View
+            key={index}
+            style={[
+              styles.recordingWaveBar,
+              {transform: [{scaleY: level}]},
+            ]}
+          />
+        ))}
+      </View>
+      <Text style={styles.recordingTime}>{formatDuration(seconds)}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="取消录音"
+        onPress={onCancel}>
+        <Text style={styles.recordingCancel}>取消</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="完成录音"
+        onPress={onComplete}
+        style={styles.recordingDone}>
+        <Text style={styles.recordingDoneText}>完成</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export function WriteScreen() {
   const navigation = useNavigation<WriteNavigation>();
   const {colors, isDark} = useTheme();
@@ -239,6 +345,12 @@ export function WriteScreen() {
   const [showCustomFeelingInput, setShowCustomFeelingInput] = useState(false);
   const [feelingsExpanded, setFeelingsExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [photoPath, setPhotoPath] = useState<string>();
+  const [audioAttachment, setAudioAttachment] = useState<AudioAttachment>();
+  const [inkImagePath, setInkImagePath] = useState<string>();
+  const [placeDetail, setPlaceDetail] = useState<string>();
+  const [showCamera, setShowCamera] = useState(false);
+  const [showHandwriting, setShowHandwriting] = useState(false);
   const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stampScale = useSharedValue(1);
   const stampTranslateY = useSharedValue(0);
@@ -254,6 +366,19 @@ export function WriteScreen() {
   const whiteFieldStyle = {
     backgroundColor: isDark ? colors.background : '#FEFCF5',
   };
+  const handleAudioComplete = useCallback(
+    (attachment: AudioAttachment) => {
+      setAudioAttachment(attachment);
+      haptics.trigger('record');
+      toast.show('录音已落下');
+    },
+    [haptics, toast],
+  );
+  const handleToolError = useCallback(
+    (message: string) => toast.show(message),
+    [toast],
+  );
+  const recorder = useAudioRecorder(handleAudioComplete, handleToolError);
 
   useFocusEffect(
     useCallback(() => {
@@ -412,6 +537,69 @@ export function WriteScreen() {
     setShowCustomFeelingInput(false);
   };
 
+  const openCamera = async () => {
+    if (await requestCameraAccess()) {
+      setShowCamera(true);
+    } else {
+      toast.show('没有相机权限，暂时不能拍照');
+    }
+  };
+
+  const addPhoto = async (path: string) => {
+    await removeMediaFile(photoPath);
+    setPhotoPath(path);
+    setShowCamera(false);
+    haptics.trigger('selection');
+    toast.show('已添加此刻的景');
+  };
+
+  const addInk = async (path: string) => {
+    await removeMediaFile(inkImagePath);
+    setInkImagePath(path);
+    setShowHandwriting(false);
+    haptics.trigger('selection');
+    toast.show('手书已落下');
+  };
+
+  const addLocation = async () => {
+    if (!(await requestLocationAccess())) {
+      toast.show('没有位置权限，暂时不能标记');
+      return;
+    }
+    Geolocation.getCurrentPosition(
+      position => {
+        const latitude = position.coords.latitude.toFixed(5);
+        const longitude = position.coords.longitude.toFixed(5);
+        setPlaceDetail(`${latitude}, ${longitude}`);
+        haptics.trigger('selection');
+        toast.show('已标记当前位置');
+      },
+      () => toast.show('暂时没有读到位置，请稍后再试'),
+      {
+        enableHighAccuracy: true,
+        timeout: 10_000,
+        maximumAge: 60_000,
+      },
+    );
+  };
+
+  const handleToolPress = (tool: string) => {
+    if (tool === 'camera') {
+      openCamera();
+    } else if (tool === 'audio') {
+      if (recorder.recording) {
+        recorder.stop(false);
+      } else {
+        haptics.trigger('record');
+        recorder.start();
+      }
+    } else if (tool === 'ink') {
+      setShowHandwriting(true);
+    } else {
+      addLocation();
+    }
+  };
+
   const renderFeelingTag = (tag: string) => {
     const selected = selectedTags.includes(tag);
     const selectedFeelingStyle = {
@@ -495,7 +683,26 @@ export function WriteScreen() {
       return;
     }
     if (isFuture) {
-      animateStamp(() => navigation.navigate('NewLetter'), false);
+      animateStamp(
+        () =>
+          navigation.navigate('NewLetter', {
+            draft: {
+              content: trimmed,
+              type: photoPath
+                ? 'photo'
+                : audioAttachment
+                  ? 'audio'
+                  : 'text',
+              customTags: selectedTags,
+              imagePath: photoPath,
+              audioPath: audioAttachment?.path,
+              audioDuration: audioAttachment?.duration,
+              inkImagePath,
+              placeDetail,
+            },
+          }),
+        false,
+      );
       return;
     }
 
@@ -503,7 +710,13 @@ export function WriteScreen() {
     try {
       const memory = await createMemory({
         content: trimmed,
+        type: photoPath ? 'photo' : audioAttachment ? 'audio' : 'text',
         customTags: selectedTags,
+        imagePath: photoPath,
+        audioPath: audioAttachment?.path,
+        audioDuration: audioAttachment?.duration,
+        inkImagePath,
+        placeDetail,
         writtenAt: new Date(),
       });
       animateStamp(() => {
@@ -514,6 +727,10 @@ export function WriteScreen() {
         setCustomFeelingTags([]);
         setCustomFeelingDraft('');
         setShowCustomFeelingInput(false);
+        setPhotoPath(undefined);
+        setAudioAttachment(undefined);
+        setInkImagePath(undefined);
+        setPlaceDetail(undefined);
         setSaving(false);
       }, true);
     } catch (error) {
@@ -522,6 +739,25 @@ export function WriteScreen() {
       toast.show('没有落稳，请再试一次');
     }
   };
+
+  if (showCamera) {
+    return (
+      <CameraOverlay
+        onCancel={() => setShowCamera(false)}
+        onCapture={addPhoto}
+      />
+    );
+  }
+
+  if (showHandwriting) {
+    return (
+      <HandwritingOverlay
+        onCancel={() => setShowHandwriting(false)}
+        onComplete={addInk}
+        onError={toast.show}
+      />
+    );
+  }
 
   return (
     <SafeAreaView
@@ -615,6 +851,126 @@ export function WriteScreen() {
                 </Text>
               ) : null}
             </ScrollView>
+
+            {photoPath || audioAttachment || inkImagePath || placeDetail ? (
+              <View style={styles.attachments}>
+                {photoPath ? (
+                  <AttachmentEnter>
+                    <View style={styles.photoAttachment}>
+                      <Image
+                        source={{uri: `file://${photoPath}`}}
+                        style={styles.photoPreview}
+                      />
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="删除照片"
+                        onPress={async () => {
+                          await removeMediaFile(photoPath);
+                          setPhotoPath(undefined);
+                        }}
+                        style={styles.removeAttachment}>
+                        <Text style={styles.removeAttachmentText}>×</Text>
+                      </Pressable>
+                    </View>
+                  </AttachmentEnter>
+                ) : null}
+                {audioAttachment ? (
+                  <AttachmentEnter>
+                    <View style={styles.audioAttachment}>
+                      <Text
+                        style={[
+                          styles.audioAttachmentIcon,
+                          {color: colors.accent},
+                        ]}>
+                        声
+                      </Text>
+                      <View style={styles.audioAttachmentWave}>
+                        {[6, 12, 8, 16, 10, 14, 7, 12, 9, 15].map(
+                          (height, index) => (
+                            <View
+                              key={index}
+                              style={[
+                                styles.audioAttachmentBar,
+                                {height, backgroundColor: colors.textFaint},
+                              ]}
+                            />
+                          ),
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.attachmentMeta,
+                          {color: colors.textMuted},
+                        ]}>
+                        {formatDuration(audioAttachment.duration)}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="删除录音"
+                        onPress={async () => {
+                          await removeMediaFile(audioAttachment.path);
+                          setAudioAttachment(undefined);
+                        }}>
+                        <Text
+                          style={[
+                            styles.inlineRemove,
+                            {color: colors.textFaint},
+                          ]}>
+                          ×
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </AttachmentEnter>
+                ) : null}
+                {inkImagePath ? (
+                  <AttachmentEnter>
+                    <View style={styles.inkAttachment}>
+                      <Image
+                        resizeMode="contain"
+                        source={{uri: `file://${inkImagePath}`}}
+                        style={styles.inkPreview}
+                      />
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="删除手书"
+                        onPress={async () => {
+                          await removeMediaFile(inkImagePath);
+                          setInkImagePath(undefined);
+                        }}
+                        style={styles.removeAttachment}>
+                        <Text style={styles.removeAttachmentText}>×</Text>
+                      </Pressable>
+                    </View>
+                  </AttachmentEnter>
+                ) : null}
+                {placeDetail ? (
+                  <AttachmentEnter>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="移除位置"
+                      onPress={() => setPlaceDetail(undefined)}
+                      style={styles.locationAttachment}>
+                      <Text
+                        style={[
+                          styles.attachmentMeta,
+                          {color: colors.textMuted},
+                        ]}>
+                        此刻坐标 · {placeDetail} ×
+                      </Text>
+                    </Pressable>
+                  </AttachmentEnter>
+                ) : null}
+              </View>
+            ) : null}
+
+            {recorder.recording ? (
+              <RecordingBar
+                seconds={recorder.seconds}
+                waveLevels={recorder.waveLevels}
+                onCancel={() => recorder.stop(true)}
+                onComplete={() => recorder.stop(false)}
+              />
+            ) : null}
 
             <GestureDetector gesture={feelingsGesture}>
               <Animated.View
@@ -793,12 +1149,22 @@ export function WriteScreen() {
                     }[tool]
                   }
                   key={tool}
-                  onPress={() => toast.show('将在下一阶段开放')}
+                  onPress={() => handleToolPress(tool)}
                   style={({pressed}) => [
                     styles.tool,
                     pressed && {backgroundColor: colors.line},
                   ]}>
-                  <ToolIcon color={colors.textFaint} name={tool} />
+                  <ToolIcon
+                    color={
+                      (tool === 'audio' && recorder.recording) ||
+                      (tool === 'camera' && photoPath) ||
+                      (tool === 'ink' && inkImagePath) ||
+                      (tool === 'location' && placeDetail)
+                        ? colors.accent
+                        : colors.textFaint
+                    }
+                    name={tool}
+                  />
                 </Pressable>
               ))}
             </View>
@@ -940,6 +1306,120 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 10,
     textAlign: 'right',
+  },
+  attachments: {
+    zIndex: 3,
+    flexShrink: 0,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.sm,
+    paddingLeft: 58,
+  },
+  photoAttachment: {
+    width: 180,
+    height: 104,
+    borderRadius: 2,
+    overflow: 'hidden',
+    transform: [{rotate: '-0.5deg'}],
+  },
+  photoPreview: {width: '100%', height: '100%'},
+  inkAttachment: {
+    width: 180,
+    height: 58,
+    borderWidth: 0.5,
+    borderColor: 'rgba(58,51,45,0.1)',
+    borderRadius: 2,
+    backgroundColor: '#FEFCF5',
+  },
+  inkPreview: {width: '100%', height: '100%'},
+  removeAttachment: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  removeAttachmentText: {color: '#FFFFFF', fontSize: 13, lineHeight: 16},
+  audioAttachment: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(58,51,45,0.05)',
+  },
+  audioAttachmentIcon: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 12,
+  },
+  audioAttachmentWave: {
+    height: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  audioAttachmentBar: {width: 1.5, borderRadius: 1},
+  attachmentMeta: {fontFamily: fontFamilies.sans, fontSize: 10},
+  inlineRemove: {paddingHorizontal: spacing.xs, fontSize: 14},
+  locationAttachment: {alignSelf: 'flex-start', paddingVertical: spacing.xxs},
+  recordingBar: {
+    zIndex: 5,
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: '#2A2F3D',
+  },
+  recordingDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#C0392B',
+  },
+  recordingWave: {
+    height: 20,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  recordingWaveBar: {
+    width: 2,
+    height: 18,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.32)',
+  },
+  recordingTime: {
+    color: 'rgba(255,255,255,0.65)',
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+  },
+  recordingCancel: {
+    color: 'rgba(255,255,255,0.55)',
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+  },
+  recordingDone: {
+    borderRadius: radius.pill,
+    backgroundColor: '#C0392B',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  recordingDoneText: {
+    color: '#FFF8F0',
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
   },
   feelings: {
     paddingBottom: 6,

@@ -10,6 +10,10 @@ export type CreateMemoryInput = {
   placeId?: string;
   placeDetail?: string;
   customTags?: string[];
+  imagePath?: string;
+  audioPath?: string;
+  audioDuration?: number;
+  inkImagePath?: string;
 };
 
 export async function createMemory(input: CreateMemoryInput) {
@@ -21,6 +25,10 @@ export async function createMemory(input: CreateMemoryInput) {
       memory.content = input.content;
       memory.placeId = input.placeId;
       memory.placeDetail = input.placeDetail;
+      memory.imagePath = input.imagePath;
+      memory.audioPath = input.audioPath;
+      memory.audioDuration = input.audioDuration;
+      memory.inkImagePath = input.inkImagePath;
       memory.bodyTags = '[]';
       memory.heartTags = '[]';
       memory.customTags = JSON.stringify(input.customTags ?? []);

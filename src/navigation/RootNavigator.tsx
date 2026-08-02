@@ -31,10 +31,23 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
+export type FutureLetterDraft = {
+  content: string;
+  type: string;
+  customTags: string[];
+  imagePath?: string;
+  audioPath?: string;
+  audioDuration?: number;
+  inkImagePath?: string;
+  placeDetail?: string;
+};
+
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
-  Unseal: {letterId?: string} | undefined;
-  NewLetter: undefined;
+  Unseal:
+    | {letterId?: string; source?: 'daily' | 'letters'}
+    | undefined;
+  NewLetter: {draft: FutureLetterDraft};
   About: undefined;
 };
 
