@@ -1,6 +1,6 @@
 # Session Handoff
 
-Updated: 2026-08-02
+Updated: 2026-08-03
 
 ## Current Boundary
 
@@ -12,6 +12,12 @@ Updated: 2026-08-02
   `f0f8697`.
 - New uncommitted work after `f0f8697` adds editable future-letter reminder
   time in Profile and a WatermelonDB v1-to-v2 settings migration.
+- Reminder-time and schema-v2 work was committed separately as `947a10c`.
+- New uncommitted work after `947a10c` implements Stage 7 Faraway with real
+  WatermelonDB place aggregation and a Debug seed v4 location correction.
+- The same uncommitted working tree now includes Stage 8 Profile and local data
+  management. The user asked to keep Stage 7 and Stage 8 together for a later
+  commit; do not commit either stage yet.
 - Daily memory detail and the opened-letter reading page have both been
   redesigned with the shared warm-paper visual language.
 - Daily replies are persisted once and now appear both in their parent memory
@@ -29,7 +35,7 @@ Updated: 2026-08-02
   `origin = https://github.com/kkkkkk12138/DU.git`
 - The remote repository is private and owned by the authorized GitHub account.
 - Remote `main` is currently `9235fd5` and contains the original HTML prototype.
-- Local `main` is `f0f8697` and contains the React Native history. The two
+- Local `main` is `947a10c` and contains the React Native history. The two
   histories have no common ancestor.
 - The user chose to preserve the HTML prototype and merge the React Native
   project into remote `main`. Do not force-push or delete the prototype.
@@ -240,6 +246,68 @@ Stage 6 verification completed:
 - Date Picker's invalid TurboModule registration under the New Architecture is
   fixed through `patch-package`.
 
+## Stage 7 Implemented Work
+
+- Faraway now reads the local User, Place, and non-deleted ordinary Memory
+  records from WatermelonDB instead of rendering a placeholder.
+- The screen follows the supplied ink-landscape prototype with:
+  - real city and place-linked memory counts
+  - current-city stay duration calculated by local calendar day
+  - hometown time-away calculated from the stored last visit
+  - visited-place cards sorted by stored visit dates
+  - place detail sheets with persisted fragments and explicit empty states
+- Memory-to-place ownership uses only persisted `place_id`. It does not infer a
+  city from prose, tags, coordinates, or example content.
+- The detail sheet closes through backdrop press, its 44pt close control, and
+  the Android back action through native Modal `onRequestClose`.
+- `寄封信回去` opens Write without fabricating a recipient or draft.
+- Debug seed v4 corrects the Tokyo development fragment from `shanghai` to
+  `tokyo` and upserts fixed seed IDs so future seed-version changes do not
+  create duplicate records.
+
+## Stage 8 Implemented Work
+
+- Profile was rejected once for not following the supplied prototype and then
+  rebuilt against `profile.html` v6 as the visual authority. It now uses the
+  exact compact one-screen structure: 38pt identity avatar, 35pt rows, 9pt
+  section labels, 20pt tinted icon wells, 32x18 toggles, original copy, and the
+  original row order. Do not restore the rejected large title/card layout.
+- Profile shows the persisted nickname, avatar character, real account age, and
+  Du number. Real WatermelonDB counts remain available in the repository but
+  are not rendered because profile v6 removed the old statistics card.
+- A dedicated editor updates only existing User fields; unsupported demographic
+  or remote-avatar fields were not fabricated.
+- Daily reminders request notification permission only when enabled and use a
+  repeating Notifee trigger at the selected local time. Disabling removes the
+  trigger.
+- Letter-arrival reminders use the persisted arrival time and remove all
+  pending future-letter triggers when disabled. Profile v6 intentionally has no
+  extra reminder-time row.
+- The privacy lock uses the device's supported biometric type through Keychain.
+  It verifies on enable, at cold start, and after returning from background;
+  cancellation leaves the app locked.
+- Per the latest product direction, Profile no longer exposes backup or data
+  export, and the former screen/service/routes were removed.
+- Account sync is not implemented. Do not claim logged-in data is protected
+  until authentication, server-side storage, attachment upload, conflict
+  handling, restore, and deletion have been implemented and verified.
+- `我的年度` is now a real current-year summary derived from persisted
+  memories, places, and letters: active days, top month, top place, sent
+  letters, opened letters, and the first-to-last entry range.
+- Feedback is an in-app composer that uses the system share sheet and adds only
+  app/system metadata. It never attaches diary content automatically.
+- About now contains readable local Privacy Policy and Terms pages, accurate
+  version/build metadata, data handling disclosures, and feedback. The rating
+  row is hidden until a real App Store ID is configured.
+- Onboarding users can read and close the privacy policy before checking
+  consent; the previous non-interactive colored text was removed.
+- Profile editing now presents explicit avatar choices and an editable nickname,
+  persists both to the User record, and refreshes Profile on return.
+- Art skins are a distinct future feature and no longer open the light/dark
+  appearance selector.
+- `ProfileEdit`, `AnnualSummary`, `Feedback`, and `LegalDocument` are
+  registered as typed stack routes and deep-link paths.
+
 ## Latest Verification
 
 All passed after the latest changes:
@@ -256,9 +324,46 @@ xcodebuild (iPhone 17 Pro simulator, Debug)
 Latest Jest result:
 
 ```text
-10 suites passed
-35 tests passed
+14 suites passed
+48 tests passed
 ```
+
+Stage 7 verification:
+
+- Pure tests cover local-calendar duration, date ranges, strict `place_id`
+  grouping, and exclusion of unlinked prose from city statistics.
+- Integration coverage opens and closes the current-place detail sheet.
+- Signed iOS Debug build succeeded with isolated DerivedData, installed on the
+  iPhone 17 Pro simulator, and launched as process `65820`.
+- Startup logs contained no JavaScript, WatermelonDB, seed, or fatal errors.
+- Simulator SQLite confirmed `development_seed_version=4`, one row per fixed
+  seed ID, eight Shanghai fragments, and one Tokyo fragment correctly linked
+  to `tokyo`.
+
+Stage 8 verification:
+
+- Unit tests cover local daily-reminder rollover and repeating trigger
+  scheduling, real Profile aggregation, annual aggregation, and trimmed profile
+  updates.
+- Integration coverage verifies denied notification permission does not turn on
+  Daily reminders, confirms the compact row opens the time picker after
+  permission, and confirms the Profile editor persists its values.
+- Clean unsigned and locally signed iOS Debug builds both succeeded with Xcode
+  26.6 using `/tmp/du-app-derived-data-stage8`.
+- The signed app installed and launched on the iPhone 17 Pro simulator as
+  process `73151`; logs contained no JavaScript, WatermelonDB, native-module, or
+  fatal errors.
+- A post-rebuild simulator screenshot was OCR-checked against `profile.html`
+  v6: all 13 prototype rows, four groups, account header, version, footer, and
+  bottom tabs were visible in one screen and in the original order. The
+  temporary Profile initial route used for this check was restored to Daily.
+- The simulator cannot provide real Face ID or Touch ID acceptance. The
+  biometric prompt, cancellation, background lock, and unlock flow still need
+  a real-device pass.
+- The production-entry refinement rebuilt and launched successfully as process
+  `84805`. App-store submission still requires a public HTTPS copy of the
+  privacy policy and real store identifiers; the app no longer pretends those
+  external resources are configured.
 
 Reminder-time migration verification:
 
@@ -291,7 +396,8 @@ Stage 4 native verification:
   live waveform/timer, saved attachment entrance, handwriting drawing, undo,
   PNG export, and the returned handwriting thumbnail.
 - The iOS simulator has no camera device; camera capture needs a real-device
-  acceptance pass.
+  acceptance pass. The simulator no-camera message and cancel path were
+  accepted by the user.
 - Android was not built because this machine has no Android SDK, `adb`,
   `sdkmanager`, `ANDROID_HOME`, or `ANDROID_SDK_ROOT`.
 
@@ -352,12 +458,14 @@ Known format constraint:
 
 ## Next Task
 
-1. Continue from commit `f0f8697`; preserve any newer working-tree changes.
-2. Review and commit the uncommitted Profile reminder-time and schema-v2 work
-   only after user approval.
+1. Continue from commit `947a10c`; preserve all uncommitted Stage 7 and Stage 8
+   work. The user explicitly asked to commit later.
+2. Perform a real-device pass for biometric enable, cancel, background lock,
+   and unlock before treating privacy lock as accepted.
 3. Manually verify all detail and sealing animation paths with Reduce Motion
    enabled.
-4. Perform a real-device pass for microphone recording and camera capture.
+4. Perform a real-device pass for microphone recording and camera capture when
+   a device is available.
 5. Perform an Android Debug build when an isolated Android SDK is available.
 6. Decide with the user whether WAV is accepted or a recorder/transcoder change
    is authorized for M4A.
@@ -372,9 +480,9 @@ Known format constraint:
 ai-agent/work-mode-projects/6a6df7fb35cb044b98197f4d/du-app。
 先完整读取 docs/SESSION_HANDOFF.md，并按 Required Reading Order 恢复上下文。
 保留所有现有改动，不要 reset、checkout、强推或回退。当前本地 main 为
-f0f8697；其后有未提交的提醒时间设置与 Schema v2 迁移改动，已通过 35 项
-测试并在保留旧数据的 iOS 模拟器验证迁移。Stage 4–6、Daily 详情和原信详情
-已提交。远端 main 为 9235fd5，保存 HTML 原型，和本地无共同历史；后续只能
-保留原型做正常合并，禁止 force push。先检查 git status、最近提交、测试和
-迁移记录，再继续当前待办。
+947a10c；其后有未提交的 Stage 7 远方页和 Stage 8 个人与数据管理，已通过
+48 项测试及 iOS Debug 构建、安装、启动验证。用户要求后续一起提交，当前不
+提交。Stage 4–6、Daily 详情和原信详情已提交。远端 main 为 9235fd5，保存
+HTML 原型，和本地无共同历史；后续只能保留原型做正常合并，禁止 force
+push。先检查 git status、最近提交和验证记录，再继续当前待办。
 ```

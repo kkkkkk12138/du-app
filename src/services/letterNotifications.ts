@@ -67,3 +67,12 @@ export async function scheduleLetterArrivalNotification({
 export async function cancelLetterArrivalNotification(letterId: string) {
   await notifee.cancelNotification(`future-letter-${letterId}`);
 }
+
+export async function cancelAllLetterArrivalNotifications() {
+  const ids = await notifee.getTriggerNotificationIds();
+  await Promise.all(
+    ids
+      .filter(id => id.startsWith('future-letter-'))
+      .map(id => notifee.cancelNotification(id)),
+  );
+}

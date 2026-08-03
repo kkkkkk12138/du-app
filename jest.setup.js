@@ -103,7 +103,39 @@ jest.mock('react-native-fs', () => ({
     exists: jest.fn().mockResolvedValue(true),
     stat: jest.fn().mockResolvedValue({ size: 32_044 }),
     unlink: jest.fn().mockResolvedValue(undefined),
+    writeFile: jest.fn().mockResolvedValue(undefined),
   },
+}));
+
+jest.mock('react-native-keychain', () => ({
+  ACCESSIBLE: {
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY:
+      'AccessibleAfterFirstUnlockThisDeviceOnly',
+  },
+  ACCESS_CONTROL: {
+    BIOMETRY_CURRENT_SET: 'BiometryCurrentSet',
+  },
+  AUTHENTICATION_TYPE: {
+    BIOMETRICS: 'AuthenticationWithBiometrics',
+  },
+  BIOMETRY_TYPE: {
+    FACE_ID: 'FaceID',
+    TOUCH_ID: 'TouchID',
+    OPTIC_ID: 'OpticID',
+    FINGERPRINT: 'Fingerprint',
+    FACE: 'Face',
+    IRIS: 'Iris',
+  },
+  getGenericPassword: jest.fn().mockResolvedValue({
+    username: 'du-owner',
+    password: 'unlocked',
+  }),
+  setGenericPassword: jest.fn().mockResolvedValue({
+    service: 'test',
+    storage: 'test',
+  }),
+  resetGenericPassword: jest.fn().mockResolvedValue(true),
+  getSupportedBiometryType: jest.fn().mockResolvedValue('FaceID'),
 }));
 
 jest.mock('react-native-view-shot', () => ({
@@ -135,6 +167,7 @@ jest.mock('@notifee/react-native', () => ({
     createChannel: jest.fn().mockResolvedValue('future-letters'),
     createTriggerNotification: jest.fn().mockResolvedValue('notification-id'),
     cancelNotification: jest.fn().mockResolvedValue(undefined),
+    getTriggerNotificationIds: jest.fn().mockResolvedValue([]),
   },
   AndroidImportance: { DEFAULT: 3 },
   AuthorizationStatus: {
@@ -144,4 +177,5 @@ jest.mock('@notifee/react-native', () => ({
     PROVISIONAL: 2,
   },
   TriggerType: { TIMESTAMP: 0 },
+  RepeatFrequency: { DAILY: 1 },
 }));

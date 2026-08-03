@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {create} from 'zustand';
-import {createJSONStorage, persist} from 'zustand/middleware';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -27,6 +27,7 @@ type SettingsState = {
   setBiometricLockOn: (enabled: boolean) => void;
   setDefaultCity: (city: string) => void;
   completeOnboarding: () => void;
+  resetAfterDataDeletion: (anonymousId: string, duNumber: string) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -44,19 +45,33 @@ export const useSettingsStore = create<SettingsState>()(
       defaultCity: '上海',
       onboardingCompleted: false,
       privacyAcceptedAt: null,
-      setHasHydrated: hasHydrated => set({hasHydrated}),
-      setIdentity: (anonymousId, duNumber) => set({anonymousId, duNumber}),
-      setThemeMode: themeMode => set({themeMode}),
-      setDailyReminderOn: dailyReminderOn => set({dailyReminderOn}),
-      setDailyReminderTime: dailyReminderTime => set({dailyReminderTime}),
-      setLetterReminderOn: letterReminderOn => set({letterReminderOn}),
-      setLetterReminderTime: letterReminderTime => set({letterReminderTime}),
-      setBiometricLockOn: biometricLockOn => set({biometricLockOn}),
-      setDefaultCity: defaultCity => set({defaultCity}),
+      setHasHydrated: hasHydrated => set({ hasHydrated }),
+      setIdentity: (anonymousId, duNumber) => set({ anonymousId, duNumber }),
+      setThemeMode: themeMode => set({ themeMode }),
+      setDailyReminderOn: dailyReminderOn => set({ dailyReminderOn }),
+      setDailyReminderTime: dailyReminderTime => set({ dailyReminderTime }),
+      setLetterReminderOn: letterReminderOn => set({ letterReminderOn }),
+      setLetterReminderTime: letterReminderTime => set({ letterReminderTime }),
+      setBiometricLockOn: biometricLockOn => set({ biometricLockOn }),
+      setDefaultCity: defaultCity => set({ defaultCity }),
       completeOnboarding: () =>
         set({
           onboardingCompleted: true,
           privacyAcceptedAt: Date.now(),
+        }),
+      resetAfterDataDeletion: (anonymousId, duNumber) =>
+        set({
+          anonymousId,
+          duNumber,
+          themeMode: 'system',
+          dailyReminderOn: false,
+          dailyReminderTime: '22:30',
+          letterReminderOn: true,
+          letterReminderTime: '09:00',
+          biometricLockOn: false,
+          defaultCity: '上海',
+          onboardingCompleted: false,
+          privacyAcceptedAt: null,
         }),
     }),
     {

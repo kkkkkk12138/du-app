@@ -1,10 +1,12 @@
-import {localStorageKey, Q} from '@nozbe/watermelondb';
+import { localStorageKey, Q } from '@nozbe/watermelondb';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import {database} from './database';
-import {Letter, Memory, Place, Tag} from './models';
+import { database } from './database';
+import { Letter, Memory, Place, Tag } from './models';
 
 const seedVersionKey = localStorageKey<number>('development_seed_version');
-const seedVersion = 3;
+const seedDisabledKey = 'du-development-seed-disabled';
+const seedVersion = 4;
 
 const places = [
   {
@@ -142,6 +144,9 @@ export async function seedDevelopmentData() {
   if (!__DEV__) {
     return;
   }
+  if ((await AsyncStorage.getItem(seedDisabledKey)) === 'true') {
+    return;
+  }
 
   const installedVersion = await database.localStorage.get(seedVersionKey);
   if (installedVersion === seedVersion) {
@@ -256,6 +261,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-photo-today',
         type: 'photo',
+        placeId: 'shanghai',
         content:
           '下班走出写字楼的时候，风很大。忽然想起小时候课本里写的“春风不度玉门关”，上海的风倒是毫不客气地度了我。',
         placeDetail: '陆家嘴 · 风很大',
@@ -267,6 +273,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-project-today',
         type: 'text',
+        placeId: 'shanghai',
         content:
           '今天把项目交付了。没有想象中的如释重负，只是觉得，啊，原来走到这里是这种感觉。像走了很久的路，抬头发现已经过了桥。',
         placeDetail: '公司',
@@ -277,6 +284,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-audio-yesterday',
         type: 'audio',
+        placeId: 'shanghai',
         content:
           '一个人在江边坐了很久。对面外滩的灯亮起来的时候，忽然想起很多年前在电视上看到上海的夜晚……没想到自己真的站在这里了。',
         placeDetail: '外滩',
@@ -288,6 +296,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-note-yesterday',
         type: 'note',
+        placeId: 'shanghai',
         content: '妈打电话来，问吃了没。说了句吃了，忽然鼻子有点酸。',
         placeDetail: '家里',
         tags: ['想家'],
@@ -297,6 +306,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-tokyo-old',
         type: 'text',
+        placeId: 'tokyo',
         content:
           '在新宿的街头迷路了，但是一点都不着急。原来在陌生的地方，反而最自在。',
         placeDetail: '新宿',
@@ -307,6 +317,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-dinner-old',
         type: 'text',
+        placeId: 'shanghai',
         content:
           '今天也是一个人吃的晚饭。在楼下便利店买了关东煮，站在路边吃完的。去年冬天也是这样，那时候觉得好孤独，今天倒觉得还好。人是会习惯的，习惯了就不苦了。',
         placeDetail: '小区门口',
@@ -317,6 +328,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-anchor-march',
         type: 'anchor',
+        placeId: 'shanghai',
         content:
           '玉兰花又开了。公司楼下那棵树，去年来的时候就开过一次，今年居然又开了。我好像在这里已经一年了。',
         placeDetail: '张江',
@@ -327,6 +339,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-photo-march',
         type: 'photo',
+        placeId: 'shanghai',
         content: '楼下的玉兰，还是去年那棵。',
         placeDetail: '张江',
         tags: ['春天的味道', '释然'],
@@ -337,6 +350,7 @@ export async function seedDevelopmentData() {
       {
         id: 'seed-v3-overtime-march',
         type: 'text',
+        placeId: 'shanghai',
         content:
           '今天加班到凌晨两点，走出公司的时候一个人都没有。打车回家，司机师傅说“小姑娘这么晚下班啊”，我说嗯。他说“年轻人别太累了”。我在后座差点哭出来。',
         placeDetail: '出租车',
@@ -346,24 +360,47 @@ export async function seedDevelopmentData() {
       },
     ];
 
+    const existingDailySeeds = await database
+      .get<Memory>('memories')
+      .query(Q.where('id', Q.oneOf(dailySeeds.map(item => item.id))))
+      .fetch();
+    const existingById = new Map(
+      existingDailySeeds.map(memory => [memory.id, memory]),
+    );
+    const applyDailySeed = (
+      memory: Memory,
+      item: (typeof dailySeeds)[number],
+      isNew = false,
+    ) => {
+      memory.type = item.type;
+      memory.content = item.content;
+      memory.placeId = item.placeId;
+      memory.placeDetail = item.placeDetail;
+      memory.audioDuration = item.audioDuration;
+      memory.bodyTags = '[]';
+      memory.heartTags = '[]';
+      memory.customTags = JSON.stringify(item.tags);
+      memory.photoTone = item.photoTone;
+      memory.mood = item.mood;
+      memory.writtenAt = item.writtenAt;
+      if (isNew) {
+        memory.createdAt = now;
+      }
+      memory.updatedAt = now;
+      memory.isFutureLetter = false;
+      memory.deleted = false;
+    };
+
     for (const item of dailySeeds) {
+      const existing = existingById.get(item.id);
+      if (existing) {
+        await existing.update(memory => applyDailySeed(memory, item));
+        continue;
+      }
+
       await database.get<Memory>('memories').create(memory => {
         memory._raw.id = item.id;
-        memory.type = item.type;
-        memory.content = item.content;
-        memory.placeId = 'shanghai';
-        memory.placeDetail = item.placeDetail;
-        memory.audioDuration = item.audioDuration;
-        memory.bodyTags = '[]';
-        memory.heartTags = '[]';
-        memory.customTags = JSON.stringify(item.tags);
-        memory.photoTone = item.photoTone;
-        memory.mood = item.mood;
-        memory.writtenAt = item.writtenAt;
-        memory.createdAt = now;
-        memory.updatedAt = now;
-        memory.isFutureLetter = false;
-        memory.deleted = false;
+        applyDailySeed(memory, item, true);
       });
     }
   });

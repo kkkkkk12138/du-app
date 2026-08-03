@@ -1,6 +1,6 @@
-import {LinkingOptions} from '@react-navigation/native';
+import { LinkingOptions } from '@react-navigation/native';
 
-import type {RootStackParamList} from './RootNavigator';
+import type { RootStackParamList } from './RootNavigator';
 
 export const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['duapp://'],
@@ -17,6 +17,11 @@ export const linking: LinkingOptions<RootStackParamList> = {
       },
       Unseal: 'unseal/:letterId?',
       NewLetter: 'new-letter',
+      ProfileEdit: 'profile/edit',
+      AnnualSummary: 'profile/annual',
+      Feedback: 'profile/feedback',
+      LegalDocument: 'legal/:type',
+      About: 'about',
     },
   },
 };

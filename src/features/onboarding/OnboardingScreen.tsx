@@ -1,18 +1,21 @@
-import React, {useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-
-import {useHaptics} from '../../hooks/useHaptics';
-import {useSettingsStore} from '../../store/useSettingsStore';
-import {useTheme} from '../../theme/useTheme';
-import {radius} from '../../tokens/radius';
-import {shadows} from '../../tokens/shadows';
-import {spacing} from '../../tokens/spacing';
+import React, { useState } from 'react';
 import {
-  fontFamilies,
-  fontSizes,
-  lineHeights,
-} from '../../tokens/typography';
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { useHaptics } from '../../hooks/useHaptics';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { useTheme } from '../../theme/useTheme';
+import { radius } from '../../tokens/radius';
+import { shadows } from '../../tokens/shadows';
+import { spacing } from '../../tokens/spacing';
+import { fontFamilies, fontSizes, lineHeights } from '../../tokens/typography';
 
 const pages = [
   {
@@ -36,13 +39,14 @@ const pages = [
 ] as const;
 
 export function OnboardingScreen() {
-  const {colors} = useTheme();
+  const { colors } = useTheme();
   const haptics = useHaptics();
   const completeOnboarding = useSettingsStore(
     state => state.completeOnboarding,
   );
   const [page, setPage] = useState(0);
   const [accepted, setAccepted] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const current = pages[page];
   const isLast = page === pages.length - 1;
   const disabled = isLast && !accepted;
@@ -65,10 +69,11 @@ export function OnboardingScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.safeArea, {backgroundColor: colors.background}]}>
+      style={[styles.safeArea, { backgroundColor: colors.background }]}
+    >
       <View style={styles.header}>
-        <Text style={[styles.brand, {color: colors.textMuted}]}>渡 · DU</Text>
-        <Text style={[styles.pageNumber, {color: colors.textFaint}]}>
+        <Text style={[styles.brand, { color: colors.textMuted }]}>渡 · DU</Text>
+        <Text style={[styles.pageNumber, { color: colors.textFaint }]}>
           {page + 1} / {pages.length}
         </Text>
       </View>
@@ -81,16 +86,17 @@ export function OnboardingScreen() {
             {
               backgroundColor: colors.seal,
             },
-          ]}>
+          ]}
+        >
           <Text style={styles.markText}>{current.mark}</Text>
         </View>
-        <Text style={[styles.eyebrow, {color: colors.accent}]}>
+        <Text style={[styles.eyebrow, { color: colors.accent }]}>
           {current.eyebrow}
         </Text>
-        <Text style={[styles.title, {color: colors.text}]}>
+        <Text style={[styles.title, { color: colors.text }]}>
           {current.title}
         </Text>
-        <Text style={[styles.body, {color: colors.textSoft}]}>
+        <Text style={[styles.body, { color: colors.textSoft }]}>
           {current.body}
         </Text>
       </View>
@@ -113,33 +119,42 @@ export function OnboardingScreen() {
         </View>
 
         {isLast ? (
-          <Pressable
-            accessibilityRole="checkbox"
-            accessibilityState={{checked: accepted}}
-            accessibilityLabel="同意隐私政策"
-            onPress={() => {
-              haptics.trigger('selection');
-              setAccepted(value => !value);
-            }}
-            style={({pressed}) => [
-              styles.consent,
-              {opacity: pressed ? 0.92 : 1},
-            ]}>
-            <View
-              style={[
-                styles.checkbox,
-                {
-                  borderColor: accepted ? colors.accent : colors.textMuted,
-                  backgroundColor: checkboxBackground,
-                },
-              ]}>
-              <Text style={styles.checkmark}>{accepted ? '✓' : ''}</Text>
-            </View>
-            <Text style={[styles.consentText, {color: colors.textSoft}]}>
+          <View style={styles.consent}>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: accepted }}
+              accessibilityLabel="同意隐私政策"
+              hitSlop={8}
+              onPress={() => {
+                haptics.trigger('selection');
+                setAccepted(value => !value);
+              }}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    borderColor: accepted ? colors.accent : colors.textMuted,
+                    backgroundColor: checkboxBackground,
+                  },
+                ]}
+              >
+                <Text style={styles.checkmark}>{accepted ? '✓' : ''}</Text>
+              </View>
+            </Pressable>
+            <Text style={[styles.consentText, { color: colors.textSoft }]}>
               我已阅读并同意
-              <Text style={{color: colors.accent}}>《隐私政策》</Text>
             </Text>
-          </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="阅读隐私政策"
+              onPress={() => setPrivacyOpen(true)}
+            >
+              <Text style={[styles.privacyLink, { color: colors.accent }]}>
+                《隐私政策》
+              </Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.consentPlaceholder} />
         )}
@@ -147,26 +162,61 @@ export function OnboardingScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isLast ? '同意隐私政策并开始' : '继续'}
-          accessibilityState={{disabled}}
+          accessibilityState={{ disabled }}
           disabled={disabled}
           onPress={goNext}
-          style={({pressed}) => [
+          style={({ pressed }) => [
             styles.button,
             {
               backgroundColor: buttonBackground,
               opacity: pressed ? 0.92 : 1,
-              transform: [{scale: pressed ? 0.98 : 1}],
+              transform: [{ scale: pressed ? 0.98 : 1 }],
             },
-          ]}>
-          <Text
-            style={[
-              styles.buttonText,
-              {color: buttonTextColor},
-            ]}>
+          ]}
+        >
+          <Text style={[styles.buttonText, { color: buttonTextColor }]}>
             {isLast ? '同意隐私政策并开始' : '继续'}
           </Text>
         </Pressable>
       </View>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setPrivacyOpen(false)}
+        presentationStyle="pageSheet"
+        visible={privacyOpen}
+      >
+        <SafeAreaView
+          style={[styles.privacyPage, { backgroundColor: colors.background }]}
+        >
+          <View style={styles.privacyHeader}>
+            <Text style={[styles.privacyTitle, { color: colors.text }]}>
+              隐私政策
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="关闭隐私政策"
+              onPress={() => setPrivacyOpen(false)}
+            >
+              <Text style={[styles.privacyDone, { color: colors.accent }]}>
+                完成
+              </Text>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.privacyContent}>
+            <Text style={[styles.privacyBody, { color: colors.textSoft }]}>
+              渡默认将你的文字、照片、录音、手书、地点标签和未来信保存在本机。
+              相机、相册、麦克风、位置、通知与生物识别权限只在你主动使用对应功能时申请。
+              {'\n\n'}
+              应用使用 Firebase Crashlytics
+              收集崩溃堆栈、设备与系统版本、应用版本等诊断信息，用于修复稳定性问题；诊断信息不应包含日记正文。
+              {'\n\n'}
+              渡不出售个人数据，不将日记内容用于广告画像或模型训练。只有当你主动使用系统分享时，所选内容才会交给你选择的目标应用。
+              {'\n\n'}
+              当前版本尚未提供账号同步。卸载应用或清除应用数据会移除保存在本机的内容。
+            </Text>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -202,7 +252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.seal,
-    transform: [{rotate: '-3deg'}],
+    transform: [{ rotate: '-3deg' }],
   },
   markText: {
     color: '#FFF8F0',
@@ -276,6 +326,38 @@ const styles = StyleSheet.create({
   consentText: {
     fontFamily: fontFamilies.sans,
     fontSize: fontSizes.secondary,
+  },
+  privacyLink: {
+    fontFamily: fontFamilies.sans,
+    fontSize: fontSizes.secondary,
+  },
+  privacyPage: {
+    flex: 1,
+  },
+  privacyHeader: {
+    height: 44,
+    paddingHorizontal: spacing.page,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  privacyTitle: {
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: fontSizes.title,
+  },
+  privacyDone: {
+    fontFamily: fontFamilies.sans,
+    fontSize: fontSizes.body,
+  },
+  privacyContent: {
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: 40,
+  },
+  privacyBody: {
+    fontFamily: fontFamilies.serif,
+    fontSize: fontSizes.secondary,
+    lineHeight: 25,
   },
   button: {
     minHeight: 52,

@@ -1,197 +1,171 @@
 import React from 'react';
-import {Linking, Pressable, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {useToast} from '../../components/Toast';
-import {useHaptics} from '../../hooks/useHaptics';
-import {useTheme} from '../../theme/useTheme';
-import {radius} from '../../tokens/radius';
-import {spacing} from '../../tokens/spacing';
-import {
-  fontFamilies,
-  fontSizes,
-  lineHeights,
-} from '../../tokens/typography';
+import { appMetadata } from '../../config/appMetadata';
+import { RootStackParamList } from '../../navigation/RootNavigator';
+import { useTheme } from '../../theme/useTheme';
+import { fontFamilies } from '../../tokens/typography';
 
 export function AboutScreen() {
-  const navigation = useNavigation();
-  const {colors} = useTheme();
-  const toast = useToast();
-  const haptics = useHaptics();
-
-  const openFeedback = async () => {
-    haptics.trigger('button');
-
-    try {
-      await Linking.openURL(
-        `mailto:?subject=${encodeURIComponent('渡 App 使用反馈')}`,
-      );
-    } catch {
-      toast.show('暂时无法打开邮件应用');
-    }
-  };
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { colors } = useTheme();
 
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
-      style={[styles.safeArea, {backgroundColor: colors.background}]}>
+      style={[styles.safeArea, { backgroundColor: colors.background }]}
+    >
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="返回"
+          accessibilityLabel="返回个人页"
           onPress={() => navigation.goBack()}
-          style={({pressed}) => [
-            styles.back,
-            {opacity: pressed ? 0.6 : 1},
-          ]}>
-          <Text style={[styles.backText, {color: colors.textSoft}]}>‹ 我</Text>
+        >
+          <Text style={[styles.back, { color: colors.textSoft }]}>‹ 我</Text>
         </Pressable>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>关于渡</Text>
       </View>
 
       <View style={styles.content}>
-        <View style={[styles.seal, {backgroundColor: colors.seal}]}>
-          <Text style={styles.sealText}>渡</Text>
+        <View style={[styles.mark, { borderColor: colors.seal }]}>
+          <Text style={[styles.markText, { color: colors.seal }]}>渡</Text>
         </View>
-        <Text style={[styles.title, {color: colors.text}]}>渡</Text>
-        <Text style={[styles.version, {color: colors.textMuted}]}>
-          Version 0.0.1
+        <Text style={[styles.name, { color: colors.text }]}>
+          {appMetadata.name}
         </Text>
-        <Text style={[styles.description, {color: colors.textSoft}]}>
+        <Text style={[styles.version, { color: colors.textFaint }]}>
+          版本 {appMetadata.version}（{appMetadata.build}）
+        </Text>
+        <Text style={[styles.slogan, { color: colors.textSoft }]}>
           把此刻落下，等时间寄回来。
         </Text>
 
-        <View
-          style={[
-            styles.list,
-            {backgroundColor: colors.surface, borderColor: colors.line},
-          ]}>
+        <View style={[styles.group, { backgroundColor: colors.surface }]}>
           <AboutRow
             label="隐私政策"
-            onPress={() => {
-              haptics.trigger('button');
-              toast.show('即将上线');
-            }}
+            onPress={() =>
+              navigation.navigate('LegalDocument', { type: 'privacy' })
+            }
           />
-          <View style={[styles.divider, {backgroundColor: colors.line}]} />
+          <AboutRow
+            label="服务条款"
+            onPress={() =>
+              navigation.navigate('LegalDocument', { type: 'terms' })
+            }
+          />
           <AboutRow
             label="意见反馈"
-            onPress={() => openFeedback().catch(() => undefined)}
+            last
+            onPress={() => navigation.navigate('Feedback')}
           />
         </View>
 
-        <Text style={[styles.copyright, {color: colors.textFaint}]}>
-          © 2026
+        <Text style={[styles.localFirst, { color: colors.textMuted }]}>
+          本地优先 · 不出售个人数据
+        </Text>
+        <Text style={[styles.copyright, { color: colors.textFaint }]}>
+          {appMetadata.copyright}
         </Text>
       </View>
     </SafeAreaView>
   );
 }
 
-function AboutRow({label, onPress}: {label: string; onPress: () => void}) {
-  const {colors} = useTheme();
-
+function AboutRow({
+  label,
+  last,
+  onPress,
+}: {
+  label: string;
+  last?: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={({pressed}) => [
+      style={({ pressed }) => [
         styles.row,
-        {
-          opacity: pressed ? 0.92 : 1,
-          transform: [{scale: pressed ? 0.98 : 1}],
-        },
-      ]}>
-      <Text style={[styles.rowText, {color: colors.text}]}>{label}</Text>
-      <Text style={[styles.chevron, {color: colors.textMuted}]}>›</Text>
+        last ? styles.lastRow : null,
+        { borderBottomColor: colors.line, opacity: pressed ? 0.72 : 1 },
+      ]}
+    >
+      <Text style={[styles.rowText, { color: colors.text }]}>{label}</Text>
+      <Text style={[styles.chevron, { color: colors.textFaint }]}>›</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
   header: {
-    height: spacing.navbar,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.page,
+    height: 44,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  back: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.sm,
-    paddingRight: spacing.lg,
-  },
-  backText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: fontSizes.body,
+  back: { fontFamily: fontFamilies.sans, fontSize: 14 },
+  headerTitle: {
+    position: 'absolute',
+    left: 80,
+    right: 80,
+    textAlign: 'center',
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 15,
   },
   content: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: spacing.page,
-    paddingTop: spacing.xxxl,
+    paddingHorizontal: 16,
+    paddingTop: 28,
   },
-  seal: {
-    width: 72,
-    height: 72,
+  mark: {
+    width: 56,
+    height: 56,
+    borderWidth: 1,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.seal,
-    transform: [{rotate: '-3deg'}],
+    transform: [{ rotate: '-3deg' }],
   },
-  sealText: {
-    color: '#FFF8F0',
-    fontFamily: fontFamilies.serif,
-    fontSize: 38,
-  },
-  title: {
-    marginTop: spacing.xl,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.h1,
-    lineHeight: lineHeights.h1,
-  },
+  markText: { fontFamily: fontFamilies.serif, fontSize: 28 },
+  name: { marginTop: 12, fontFamily: fontFamilies.serif, fontSize: 18 },
   version: {
+    marginTop: 2,
     fontFamily: fontFamilies.sans,
-    fontSize: fontSizes.caption,
-    letterSpacing: 1,
+    fontSize: 9.5,
+    letterSpacing: 0.5,
   },
-  description: {
-    marginTop: spacing.lg,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.body,
-    lineHeight: lineHeights.body,
-  },
-  list: {
+  slogan: { marginTop: 14, fontFamily: fontFamilies.serif, fontSize: 12 },
+  group: {
     width: '100%',
-    marginTop: spacing.xxxl,
-    borderWidth: 0.5,
-    borderRadius: radius.card,
+    marginTop: 28,
+    borderRadius: 9,
     overflow: 'hidden',
   },
   row: {
-    minHeight: 52,
+    height: 42,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 0.3,
   },
-  rowText: {
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.body,
-  },
-  chevron: {
-    fontSize: 24,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: spacing.lg,
+  lastRow: { borderBottomWidth: 0 },
+  rowText: { flex: 1, fontFamily: fontFamilies.sans, fontSize: 12 },
+  chevron: { fontFamily: fontFamilies.sans, fontSize: 13, opacity: 0.3 },
+  localFirst: {
+    marginTop: 18,
+    fontFamily: fontFamilies.sans,
+    fontSize: 9.5,
   },
   copyright: {
     marginTop: 'auto',
-    marginBottom: spacing.xxl,
+    marginBottom: 24,
     fontFamily: fontFamilies.sans,
-    fontSize: fontSizes.caption,
+    fontSize: 9.5,
   },
 });

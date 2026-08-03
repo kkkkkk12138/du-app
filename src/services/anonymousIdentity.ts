@@ -1,9 +1,9 @@
-import {Q} from '@nozbe/watermelondb';
-import {randomId} from '@nozbe/watermelondb/utils/common';
+import { Q } from '@nozbe/watermelondb';
+import { randomId } from '@nozbe/watermelondb/utils/common';
 import * as Keychain from 'react-native-keychain';
 
-import {database} from '../db/database';
-import {Place, Setting, User} from '../db/models';
+import { database } from '../db/database';
+import { Place, Setting, User } from '../db/models';
 
 const keychainService = 'cn.du.app.anonymous-identity';
 const settingsRecordId = 'local-settings';
@@ -112,4 +112,8 @@ export async function initializeAnonymousIdentity() {
     anonymousId,
     duNumber: user.duNumber,
   };
+}
+
+export async function resetAnonymousIdentity() {
+  await Keychain.resetGenericPassword({ service: keychainService });
 }

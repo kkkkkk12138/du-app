@@ -9,22 +9,26 @@ import {
   BottomTabBarProps,
   createBottomTabNavigator,
 } from '@react-navigation/bottom-tabs';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import {TabBar} from '../components/TabBar';
-import {DailyScreen} from '../features/daily/DailyScreen';
-import {FarawayScreen} from '../features/faraway/FarawayScreen';
-import {LettersScreen} from '../features/letters/LettersScreen';
-import {NewLetterScreen} from '../features/newLetter/NewLetterScreen';
-import {AboutScreen} from '../features/profile/AboutScreen';
-import {ProfileScreen} from '../features/profile/ProfileScreen';
-import {UnsealScreen} from '../features/unseal/UnsealScreen';
-import {WriteScreen} from '../features/write/WriteScreen';
-import {useTheme} from '../theme/useTheme';
-import {linking} from './linking';
+import { TabBar } from '../components/TabBar';
+import { DailyScreen } from '../features/daily/DailyScreen';
+import { FarawayScreen } from '../features/faraway/FarawayScreen';
+import { LettersScreen } from '../features/letters/LettersScreen';
+import { NewLetterScreen } from '../features/newLetter/NewLetterScreen';
+import { AboutScreen } from '../features/profile/AboutScreen';
+import { AnnualSummaryScreen } from '../features/profile/AnnualSummaryScreen';
+import { FeedbackScreen } from '../features/profile/FeedbackScreen';
+import { LegalDocumentScreen } from '../features/profile/LegalDocumentScreen';
+import { ProfileEditScreen } from '../features/profile/ProfileEditScreen';
+import { ProfileScreen } from '../features/profile/ProfileScreen';
+import { UnsealScreen } from '../features/unseal/UnsealScreen';
+import { WriteScreen } from '../features/write/WriteScreen';
+import { useTheme } from '../theme/useTheme';
+import { linking } from './linking';
 
 export type MainTabParamList = {
-  Daily: {newMemoryId?: string} | undefined;
+  Daily: { newMemoryId?: string } | undefined;
   Letters: undefined;
   Write: undefined;
   Faraway: undefined;
@@ -44,11 +48,13 @@ export type FutureLetterDraft = {
 
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
-  Unseal:
-    | {letterId?: string; source?: 'daily' | 'letters'}
-    | undefined;
-  NewLetter: {draft: FutureLetterDraft};
+  Unseal: { letterId?: string; source?: 'daily' | 'letters' } | undefined;
+  NewLetter: { draft: FutureLetterDraft };
   About: undefined;
+  ProfileEdit: undefined;
+  AnnualSummary: undefined;
+  Feedback: undefined;
+  LegalDocument: { type: 'privacy' | 'terms' };
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -62,8 +68,9 @@ function MainTabs() {
   return (
     <Tab.Navigator
       initialRouteName="Daily"
-      screenOptions={{headerShown: false}}
-      tabBar={renderTabBar}>
+      screenOptions={{ headerShown: false }}
+      tabBar={renderTabBar}
+    >
       <Tab.Screen name="Daily" component={DailyScreen} />
       <Tab.Screen name="Letters" component={LettersScreen} />
       <Tab.Screen name="Write" component={WriteScreen} />
@@ -74,7 +81,7 @@ function MainTabs() {
 }
 
 export function RootNavigator() {
-  const {colors, isDark} = useTheme();
+  const { colors, isDark } = useTheme();
   const baseTheme = isDark ? DarkTheme : DefaultTheme;
   const navigationTheme = {
     ...baseTheme,
@@ -90,29 +97,32 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer
-      linking={linking}
-      theme={navigationTheme}>
+    <NavigationContainer linking={linking} theme={navigationTheme}>
       <Stack.Navigator
         initialRouteName="Main"
         screenOptions={{
           animation: 'slide_from_right',
-          contentStyle: {backgroundColor: colors.background},
+          contentStyle: { backgroundColor: colors.background },
           headerShown: false,
           orientation: 'portrait',
-        }}>
+        }}
+      >
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen
           name="Unseal"
           component={UnsealScreen}
-          options={{presentation: 'fullScreenModal'}}
+          options={{ presentation: 'fullScreenModal' }}
         />
         <Stack.Screen
           name="NewLetter"
           component={NewLetterScreen}
-          options={{presentation: 'fullScreenModal'}}
+          options={{ presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="About" component={AboutScreen} />
+        <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+        <Stack.Screen name="AnnualSummary" component={AnnualSummaryScreen} />
+        <Stack.Screen name="Feedback" component={FeedbackScreen} />
+        <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

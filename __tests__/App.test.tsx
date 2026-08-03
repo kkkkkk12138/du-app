@@ -20,6 +20,7 @@ import {
   getLetterDetail,
   getLettersData,
 } from '../src/features/letters/lettersRepository';
+import { updateProfile } from '../src/features/profile/profileRepository';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
 jest.mock('react-native-reanimated', () => {
@@ -86,6 +87,57 @@ jest.mock('../src/features/letters/lettersRepository', () => ({
   }),
   getLetterDetail: jest.fn().mockRejectedValue(new Error('没有可拆的信')),
   markLetterOpened: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../src/features/faraway/farawayRepository', () => ({
+  getFarawayData: jest.fn().mockResolvedValue({
+    current: {
+      id: 'shanghai',
+      name: '上海',
+      chChar: '沪',
+      pinyin: 'Shanghai',
+      colorHex: '#C0392B',
+      type: 'current',
+      visitCount: 1,
+      sortOrder: 100,
+      dateRange: '2025.2 — 至今',
+      stayedDays: 530,
+      tags: ['晚风'],
+      latestMemory: {
+        id: 'shanghai-memory',
+        content: '风从江面吹过来。',
+        placeId: 'shanghai',
+        customTags: '["晚风"]',
+        writtenAt: new Date(2026, 7, 2),
+      },
+      memories: [
+        {
+          id: 'shanghai-memory',
+          content: '风从江面吹过来。',
+          placeId: 'shanghai',
+          customTags: '["晚风"]',
+          writtenAt: new Date(2026, 7, 2),
+        },
+      ],
+    },
+    hometown: undefined,
+    visited: [],
+    cityCount: 1,
+    locatedMemoryCount: 1,
+    yearsLabel: '1年',
+  }),
+}));
+
+jest.mock('../src/features/profile/profileRepository', () => ({
+  getProfileData: jest.fn().mockResolvedValue({
+    nickname: '渡河人',
+    avatarChar: '渡',
+    daysSinceJoining: 327,
+    memoryCount: 8,
+    placeCount: 3,
+    letterCount: 2,
+  }),
+  updateProfile: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../src/services/anonymousIdentity', () => ({
@@ -165,7 +217,31 @@ test('blocks the home screen until privacy consent is accepted', async () => {
   });
 });
 
-test('switches all tabs and theme modes', async () => {
+test('opens the privacy policy before onboarding consent', async () => {
+  const renderer = await renderApp();
+
+  await ReactTestRenderer.act(() => {
+    renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
+    renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
+  });
+  await ReactTestRenderer.act(() => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '阅读隐私政策' })
+      .props.onPress();
+  });
+
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '关闭隐私政策' }),
+  ).toBeTruthy();
+  await ReactTestRenderer.act(() => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '关闭隐私政策' })
+      .props.onPress();
+    renderer.unmount();
+  });
+});
+
+test('switches all tabs and exposes the prototype profile settings', async () => {
   const renderer = await renderApp();
   await completeOnboarding(renderer);
 
@@ -187,15 +263,60 @@ test('switches all tabs and theme modes', async () => {
     renderer.root.findByProps({ accessibilityLabel: '收起' }).props.onPress();
   });
 
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     renderer.root.findByProps({ accessibilityLabel: '我' }).props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
   });
 
-  for (const label of ['浅色', '深色', '跟随系统']) {
-    await ReactTestRenderer.act(() => {
-      renderer.root.findByProps({ accessibilityLabel: label }).props.onPress();
-    });
-  }
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '艺术皮肤' }),
+  ).toBeTruthy();
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '深色外观' }),
+  ).toBeTruthy();
+  expect(
+    renderer.root.findAllByProps({ accessibilityLabel: '备份与导出' }),
+  ).toHaveLength(0);
+  expect(
+    renderer.root.findAllByProps({ accessibilityLabel: '导出我的数据' }),
+  ).toHaveLength(0);
+
+  await ReactTestRenderer.act(() => {
+    renderer.unmount();
+  });
+});
+
+test('opens and closes the current place detail from Faraway', async () => {
+  const renderer = await renderApp();
+  await completeOnboarding(renderer);
+
+  await ReactTestRenderer.act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: '远方' }).props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await ReactTestRenderer.act(() => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '查看当前停驻城市上海' })
+      .props.onPress();
+  });
+
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '关闭地点详情' }),
+  ).toBeTruthy();
+  expect(
+    renderer.root.findAllByProps({ children: '风从江面吹过来。' }).length,
+  ).toBeGreaterThan(0);
+
+  await ReactTestRenderer.act(() => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '关闭地点详情' })
+      .props.onPress();
+  });
+  expect(
+    renderer.root.findAllByProps({ accessibilityLabel: '关闭地点详情' }),
+  ).toHaveLength(0);
 
   await ReactTestRenderer.act(() => {
     renderer.unmount();
@@ -350,39 +471,121 @@ test('opens an archived letter and returns through the mailbox header', async ()
   getLetterDetailMock.mockRejectedValue(new Error('没有可拆的信'));
 });
 
-test('changes the arrival reminder time without requesting notification access', async () => {
+test('enables the daily reminder with the prototype inline time picker', async () => {
   const requestNotificationMock =
     notifee.requestPermission as jest.MockedFunction<
       typeof notifee.requestPermission
     >;
-  requestNotificationMock.mockClear();
-  useSettingsStore.setState({letterReminderTime: '09:00'});
+  requestNotificationMock.mockResolvedValueOnce({
+    authorizationStatus: 1,
+  } as never);
+  useSettingsStore.setState({
+    dailyReminderOn: false,
+    dailyReminderTime: '22:30',
+  });
 
   const renderer = await renderApp();
   await completeOnboarding(renderer);
-  await ReactTestRenderer.act(() => {
-    renderer.root.findByProps({accessibilityLabel: '我'}).props.onPress();
+  await ReactTestRenderer.act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: '我' }).props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
   });
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     renderer.root
-      .findByProps({accessibilityLabel: '新信提醒时间'})
+      .findByProps({ accessibilityLabel: '每日提醒' })
       .props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
   });
 
   const picker = renderer.root.findByProps({
-    accessibilityLabel: '信件在几点靠岸',
+    accessibilityLabel: '每天几点提醒落笔',
   });
   expect(picker.props.open).toBe(true);
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     picker.props.onConfirm(new Date(2026, 7, 3, 18, 45));
+    await Promise.resolve();
+    await Promise.resolve();
   });
 
-  expect(useSettingsStore.getState().letterReminderTime).toBe('18:45');
-  expect(requestNotificationMock).not.toHaveBeenCalled();
+  expect(useSettingsStore.getState().dailyReminderTime).toBe('18:45');
+  expect(useSettingsStore.getState().dailyReminderOn).toBe(true);
+  expect(requestNotificationMock).toHaveBeenCalled();
 
   await ReactTestRenderer.act(() => {
     renderer.unmount();
   });
+});
+
+test('keeps daily reminders off when notification access is denied', async () => {
+  const requestNotificationMock =
+    notifee.requestPermission as jest.MockedFunction<
+      typeof notifee.requestPermission
+    >;
+  requestNotificationMock.mockResolvedValueOnce({
+    authorizationStatus: 0,
+  } as never);
+  useSettingsStore.setState({ dailyReminderOn: false });
+
+  const renderer = await renderApp();
+  await completeOnboarding(renderer);
+  await ReactTestRenderer.act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: '我' }).props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await ReactTestRenderer.act(async () => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '每日提醒' })
+      .props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(useSettingsStore.getState().dailyReminderOn).toBe(false);
+  await ReactTestRenderer.act(() => renderer.unmount());
+});
+
+test('edits and persists the local profile', async () => {
+  const updateProfileMock = updateProfile as jest.MockedFunction<
+    typeof updateProfile
+  >;
+  updateProfileMock.mockClear();
+  const renderer = await renderApp();
+  await completeOnboarding(renderer);
+  await ReactTestRenderer.act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: '我' }).props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await ReactTestRenderer.act(async () => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '编辑个人资料' })
+      .props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await ReactTestRenderer.act(() => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '昵称' })
+      .props.onChangeText('写字的人');
+    renderer.root
+      .findByProps({ accessibilityLabel: '头像 舟' })
+      .props.onPress();
+  });
+  await ReactTestRenderer.act(async () => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '保存个人资料' })
+      .props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(updateProfileMock).toHaveBeenCalledWith(
+    expect.objectContaining({ nickname: '写字的人', avatarChar: '舟' }),
+  );
+  await ReactTestRenderer.act(() => renderer.unmount());
 });
 
 test('writes real content and keeps future letters out of Memory storage', async () => {
