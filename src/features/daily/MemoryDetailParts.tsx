@@ -188,10 +188,12 @@ export function ReplySlip({
   memory,
   parentDate,
   index,
+  onDelete,
 }: {
   memory: Memory;
   parentDate: Date;
   index: number;
+  onDelete?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -216,6 +218,20 @@ export function ReplySlip({
       <Text style={styles.replySign}>
         {formatReplySign(parentDate, memory.writtenAt)}
       </Text>
+      {onDelete ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="删除这封回信"
+          hitSlop={8}
+          onPress={event => {
+            event.stopPropagation();
+            onDelete();
+          }}
+          style={styles.replyDelete}
+        >
+          <Text style={styles.replyDeleteText}>删除</Text>
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -366,6 +382,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     textAlign: 'right',
     fontFamily: fontFamilies.serif,
+    fontSize: 10,
+  },
+  replyDelete: {
+    alignSelf: 'flex-start',
+    minHeight: 32,
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+  },
+  replyDeleteText: {
+    color: detailColors.accent,
+    fontFamily: fontFamilies.sans,
     fontSize: 10,
   },
   teaStain: {

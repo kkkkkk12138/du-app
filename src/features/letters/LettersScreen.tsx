@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,12 +22,15 @@ import {
   MainTabParamList,
   RootStackParamList,
 } from '../../navigation/RootNavigator';
+import { cancelLetterArrivalNotification } from '../../services/letterNotifications';
+import { removeMediaFile } from '../../services/mediaStorage';
 import { radius } from '../../tokens/radius';
 import { spacing } from '../../tokens/spacing';
 import { fontFamilies, fontSizes } from '../../tokens/typography';
 import { useTheme } from '../../theme/useTheme';
 import {
   daysUntil,
+  deleteLetter,
   getLetterProgress,
   getLettersData,
   LetterSections,
@@ -302,6 +306,36 @@ export function LettersScreen() {
     [sections],
   );
 
+  const manageTravelingLetter = (item: LetterWithMemory) => {
+    const days = Math.max(1, daysUntil(item.letter.arriveDate, now));
+    Alert.alert('信件在途中', `预计还有 ${days} 天靠岸。抵达前不能提前打开。`, [
+      { text: '继续等待', style: 'cancel' },
+      {
+        text: '删除信件',
+        style: 'destructive',
+        onPress: () => {
+          deleteLetter(item)
+            .then(() =>
+              Promise.allSettled([
+                cancelLetterArrivalNotification(item.letter.id),
+                removeMediaFile(item.memory.imagePath),
+                removeMediaFile(item.memory.audioPath),
+                removeMediaFile(item.memory.inkImagePath),
+              ]),
+            )
+            .then(() => {
+              toast.show('信件已删除');
+              return load();
+            })
+              .catch(deleteError => {
+                console.error('删除在途信件失败', deleteError);
+              toast.show('信件没有删除，请再试一次');
+            });
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
@@ -376,7 +410,7 @@ export function LettersScreen() {
                 item={item}
                 key={item.letter.id}
                 now={now}
-                onPress={() => toast.show('信件在途中')}
+                onPress={() => manageTravelingLetter(item)}
               />
             ))}
           </View>

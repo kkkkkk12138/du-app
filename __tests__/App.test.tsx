@@ -308,6 +308,7 @@ test('opens and closes the current place detail from Faraway', async () => {
   expect(
     renderer.root.findAllByProps({ children: '风从江面吹过来。' }).length,
   ).toBeGreaterThan(0);
+  expect(renderer.root.findByProps({ nestedScrollEnabled: true })).toBeTruthy();
 
   await ReactTestRenderer.act(() => {
     renderer.root

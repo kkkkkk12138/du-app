@@ -19,6 +19,7 @@ type LetterReadingViewProps = {
   onBack: () => void;
   onReply: () => void;
   onArchive: () => void;
+  onDelete: () => void;
   onError: (message: string) => void;
 };
 
@@ -43,6 +44,7 @@ export function LetterReadingView({
   onBack,
   onReply,
   onArchive,
+  onDelete,
   onError,
 }: LetterReadingViewProps) {
   const isReply = item.letter.status === 'reply';
@@ -152,6 +154,17 @@ export function LetterReadingView({
             ]}
           >
             <Text style={styles.archiveText}>放回日迹</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="删除这封信"
+            onPress={onDelete}
+            style={({ pressed }) => [
+              styles.deleteAction,
+              { opacity: pressed ? 0.5 : 1 },
+            ]}
+          >
+            <Text style={styles.deleteText}>删除这封信</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -343,5 +356,16 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.serif,
     fontSize: fontSizes.caption,
     letterSpacing: 1,
+  },
+  deleteAction: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+  },
+  deleteText: {
+    color: '#A24A3B',
+    fontFamily: fontFamilies.sans,
+    fontSize: fontSizes.caption,
   },
 });

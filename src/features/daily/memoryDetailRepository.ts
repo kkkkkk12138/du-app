@@ -135,3 +135,51 @@ export async function removeMemoryStamp(stamp: Letter) {
     await stamp.destroyPermanently();
   });
 }
+
+export async function deleteMemoryReply(reply: Memory) {
+  const links = await database
+    .get<Letter>('letters')
+    .query(Q.where('reply_memory_id', reply.id))
+    .fetch();
+
+  await database.write(async () => {
+    await database.batch(
+      ...links.map(link => link.prepareDestroyPermanently()),
+      reply.prepareDestroyPermanently(),
+    );
+  });
+}
+
+export async function deleteMemory(memory: Memory) {
+  const links = await database
+    .get<Letter>('letters')
+    .query(Q.where('memory_id', memory.id))
+    .fetch();
+  const replyIds = links
+    .filter(link => link.status === 'reply' && link.replyMemoryId)
+    .map(link => link.replyMemoryId!);
+  const replies = (
+    await Promise.all(
+      replyIds.map(async id => {
+        try {
+          return await database.get<Memory>('memories').find(id);
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).filter((reply): reply is Memory => Boolean(reply));
+
+  await database.write(async () => {
+    await database.batch(
+      ...links.map(link => link.prepareDestroyPermanently()),
+      ...replies.map(reply => reply.prepareDestroyPermanently()),
+      memory.prepareUpdate(record => {
+        record.deleted = true;
+        record.updatedAt = new Date();
+      }),
+    );
+  });
+
+  return links.map(link => link.id);
+}

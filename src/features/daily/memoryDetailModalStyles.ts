@@ -265,6 +265,18 @@ export const memoryDetailStyles = StyleSheet.create({
     fontFamily: fontFamilies.serif,
     fontSize: fontSizes.caption,
   },
+  deleteAction: {
+    minHeight: 44,
+    alignSelf: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xl,
+  },
+  deleteActionText: {
+    color: '#A24A3B',
+    fontFamily: fontFamilies.sans,
+    fontSize: fontSizes.caption,
+  },
   saveFeedback: {
     position: 'absolute',
     right: spacing.page,

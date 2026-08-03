@@ -10,6 +10,7 @@ import React, {
   useState,
 } from 'react';
 import {
+  Alert,
   Clipboard,
   Image,
   Modal,
@@ -58,6 +59,8 @@ import { formatDetailDate, getMemoryDateContext } from './memoryDetailLogic';
 import { memoryDetailStyles as styles } from './memoryDetailModalStyles';
 import {
   createMemoryReply,
+  deleteMemory,
+  deleteMemoryReply,
   getMemoryDetailData,
   removeMemoryStamp,
   setMemoryStamp,
@@ -66,6 +69,7 @@ import {
 type MemoryDetailModalProps = {
   memory: Memory | null;
   onDismiss: () => void;
+  onDeleted?: () => void;
 };
 
 type Sheet = 'reply' | 'stamp' | null;
@@ -80,6 +84,7 @@ const moodLabels: Record<string, string> = {
 export function MemoryDetailModal({
   memory,
   onDismiss,
+  onDeleted,
 }: MemoryDetailModalProps) {
   const insets = useSafeAreaInsets();
   const { show: showToast } = useToast();
@@ -280,6 +285,71 @@ export function MemoryDetailModal({
     }
   };
 
+  const confirmDeleteReply = (reply: Memory) => {
+    Alert.alert(
+      '删除这封回信？',
+      '回信会从这段日迹和信箱中永久移除，此操作无法撤销。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除回信',
+          style: 'destructive',
+          onPress: () => {
+            deleteMemoryReply(reply)
+              .then(() => {
+                setReplies(current =>
+                  current.filter(item => item.id !== reply.id),
+                );
+                haptics.trigger('selection');
+                showToast('回信已删除');
+              })
+              .catch(error => {
+                console.error('删除回信失败', error);
+                showToast('回信没有删除，请再试一次');
+              });
+          },
+        },
+      ],
+    );
+  };
+
+  const confirmDeleteMemory = () => {
+    if (!memory || submitting) {
+      return;
+    }
+    Alert.alert(
+      '删除这条日迹？',
+      '日迹、回信和关联的未来提醒会一并移除。此操作无法撤销。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除日迹',
+          style: 'destructive',
+          onPress: () => {
+            setSubmitting(true);
+            deleteMemory(memory)
+              .then(letterIds =>
+                Promise.allSettled(
+                  letterIds.map(cancelLetterArrivalNotification),
+                ),
+              )
+              .then(() => {
+                haptics.trigger('selection');
+                showToast('日迹已删除');
+                onDeleted?.();
+                onDismiss();
+              })
+              .catch(error => {
+                console.error('删除日迹失败', error);
+                showToast('日迹没有删除，请再试一次');
+              })
+              .finally(() => setSubmitting(false));
+          },
+        },
+      ],
+    );
+  };
+
   const copyMemory = () => {
     if (!memory) {
       return;
@@ -477,6 +547,7 @@ export function MemoryDetailModal({
                       index={index}
                       key={reply.id}
                       memory={reply}
+                      onDelete={() => confirmDeleteReply(reply)}
                       parentDate={memory.writtenAt}
                     />
                   ))
@@ -556,6 +627,18 @@ export function MemoryDetailModal({
                   <Text style={styles.secondaryActionText}>存为图</Text>
                 </Pressable>
               </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="删除这条日迹"
+                disabled={submitting}
+                onPress={confirmDeleteMemory}
+                style={({ pressed }) => [
+                  styles.deleteAction,
+                  { opacity: submitting ? 0.35 : pressed ? 0.55 : 1 },
+                ]}
+              >
+                <Text style={styles.deleteActionText}>删除这条日迹</Text>
+              </Pressable>
             </View>
           </ScrollView>
         </Animated.View>

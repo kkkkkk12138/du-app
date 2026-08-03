@@ -446,6 +446,37 @@ Latest detail and mailbox verification:
 - Signed iOS Debug build succeeded and launched as process `41033`; startup logs
   contained no fatal, module-resolution, or invariant errors.
 
+Content deletion and Faraway verification:
+
+- Daily memories, individual replies, opened letters, unopened letters, and
+  traveling letters now expose destructive actions with native confirmation.
+- Deleting a Daily memory soft-deletes the parent record and permanently
+  removes its linked reply records and Letter rows. Deleting a letter removes
+  the Letter and its owned Memory without deleting an unrelated parent memory.
+- Letter deletion cancels its Notifee arrival notification and removes owned
+  media files. Daily soft deletion intentionally retains parent media pending a
+  future trash or retention policy.
+- Faraway place details open at a consistent 82% viewport height. The top handle
+  supports dragging between compact, default, and expanded stops; the memory
+  list keeps independent nested scrolling.
+- Each memory fragment in a place detail opens the existing full Daily memory
+  detail, including attachments, replies, export, and deletion behavior.
+- Jest covers deletion persistence and the scrollable place sheet. The
+  adjustable sheet and Faraway-to-memory-detail path pass TypeScript, lint, and
+  the iOS simulator build. All 16 suites and 53 tests pass.
+- TypeScript, ESLint, `git diff --check`, and an iOS simulator Debug build pass.
+  The latest build used `/tmp/du-app-derived-data-delete`.
+
+Volcengine authorization status:
+
+- TRAE service authorization reported success, but `vefaas 0.3.1` still reports
+  no local credentials through `vefaas login --check` and `vefaas doctor`.
+- No veFaaS, API Gateway, database, or TOS resource has been created, so this
+  work has not introduced cloud billing.
+- Do not bypass the connector with an interactive SSO login. Retry connector
+  authorization in a new conversation, then inventory existing resources
+  before creating the phone/email account and sync backend.
+
 Known format constraint:
 
 - The recorder interface writes PCM/WAV on iOS and Android. The iOS native
@@ -470,18 +501,21 @@ Known format constraint:
 
 ## Next Task
 
-1. Continue from commit `947a10c`; preserve all uncommitted Stage 7 and Stage 8
-   work. The user explicitly asked to commit later.
-2. Perform a real-device pass for biometric enable, cancel, background lock,
+1. Commit the verified content-deletion and Faraway-detail changes. Preserve the
+   existing local commits `d61620e` and `51b2660`.
+2. Retry Volcengine connector authorization. Once credentials are available,
+   inventory existing veFaaS, API Gateway, database, and TOS resources before
+   designing or creating account-sync infrastructure.
+3. Perform a real-device pass for biometric enable, cancel, background lock,
    and unlock before treating privacy lock as accepted.
-3. Manually verify all detail and sealing animation paths with Reduce Motion
+4. Manually verify all detail and sealing animation paths with Reduce Motion
    enabled.
-4. Perform a real-device pass for microphone recording and camera capture when
+5. Perform a real-device pass for microphone recording and camera capture when
    a device is available.
-5. Perform an Android Debug build when an isolated Android SDK is available.
-6. Decide with the user whether WAV is accepted or a recorder/transcoder change
+6. Perform an Android Debug build when an isolated Android SDK is available.
+7. Decide with the user whether WAV is accepted or a recorder/transcoder change
    is authorized for M4A.
-7. Complete the non-force remote merge only after local GitHub credentials are
+8. Complete the non-force remote merge only after local GitHub credentials are
    available. Preserve remote HTML prototype commit `9235fd5`.
 
 ## Suggested New-Task Prompt
@@ -492,9 +526,10 @@ Known format constraint:
 ai-agent/work-mode-projects/6a6df7fb35cb044b98197f4d/du-app。
 先完整读取 docs/SESSION_HANDOFF.md，并按 Required Reading Order 恢复上下文。
 保留所有现有改动，不要 reset、checkout、强推或回退。当前本地 main 为
-947a10c；其后有未提交的 Stage 7 远方页和 Stage 8 个人与数据管理，已通过
-48 项测试及 iOS Debug 构建、安装、启动验证。用户要求后续一起提交，当前不
-提交。Stage 4–6、Daily 详情和原信详情已提交。远端 main 为 9235fd5，保存
-HTML 原型，和本地无共同历史；后续只能保留原型做正常合并，禁止 force
-push。先检查 git status、最近提交和验证记录，再继续当前待办。
+51b2660；其后有未提交的内容删除、远方可拖动详情和地点内日迹详情跳转，
+已通过 53 项测试、TypeScript、ESLint 和 iOS Debug 构建。先提交这些改动。
+火山连接器授权曾成功，但 vefaas CLI 仍无凭据，不要绕过连接器执行交互式
+SSO。远端 main 为 9235fd5，保存 HTML 原型，和本地无共同历史；后续只能
+保留原型做正常合并，禁止 force push。先检查 git status、最近提交和验证
+记录，再继续火山授权与账号同步。
 ```

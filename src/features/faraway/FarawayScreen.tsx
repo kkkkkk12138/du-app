@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -6,13 +6,22 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useToast } from '../../components/Toast';
+import { Memory } from '../../db/models';
 import { useHaptics } from '../../hooks/useHaptics';
 import { MainTabParamList } from '../../navigation/RootNavigator';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -21,8 +30,9 @@ import { radius } from '../../tokens/radius';
 import { shadows } from '../../tokens/shadows';
 import { spacing } from '../../tokens/spacing';
 import { fontFamilies, fontSizes, lineHeights } from '../../tokens/typography';
+import { MemoryDetailModal } from '../daily/MemoryDetailModal';
 import { FarawayViewData, PlaceSummary } from './farawayLogic';
-import { getFarawayData } from './farawayRepository';
+import { getFarawayData, getFarawayMemory } from './farawayRepository';
 
 type FarawayNavigation = BottomTabNavigationProp<MainTabParamList, 'Faraway'>;
 
@@ -389,11 +399,79 @@ function PlaceCard({
 function PlaceDetailModal({
   place,
   onClose,
+  onOpenMemory,
 }: {
   place?: PlaceSummary;
   onClose: () => void;
+  onOpenMemory: (memoryId: string) => void;
 }) {
   const { colors } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
+  const minimumHeight = Math.max(280, windowHeight * 0.5);
+  const defaultHeight = windowHeight * 0.82;
+  const maximumHeight = windowHeight * 0.92;
+  const sheetHeight = useSharedValue(defaultHeight);
+  const gestureStartHeight = useSharedValue(defaultHeight);
+
+  useEffect(() => {
+    if (place) {
+      sheetHeight.value = defaultHeight;
+    }
+  }, [defaultHeight, place, sheetHeight]);
+
+  const settleHeight = (nextHeight: number) => {
+    const lowerBoundary = (minimumHeight + defaultHeight) / 2;
+    const upperBoundary = (defaultHeight + maximumHeight) / 2;
+    const target =
+      nextHeight < lowerBoundary
+        ? minimumHeight
+        : nextHeight > upperBoundary
+        ? maximumHeight
+        : defaultHeight;
+    sheetHeight.value = withSpring(target, {
+      damping: 24,
+      stiffness: 240,
+    });
+  };
+
+  const dragGesture = Gesture.Pan()
+    .onBegin(() => {
+      gestureStartHeight.value = sheetHeight.value;
+    })
+    .onUpdate(event => {
+      sheetHeight.value = Math.min(
+        maximumHeight,
+        Math.max(minimumHeight, gestureStartHeight.value - event.translationY),
+      );
+    })
+    .onEnd(event => {
+      const projectedHeight = sheetHeight.value - event.velocityY * 0.12;
+      const lowerBoundary = (minimumHeight + defaultHeight) / 2;
+      const upperBoundary = (defaultHeight + maximumHeight) / 2;
+      const target =
+        projectedHeight < lowerBoundary
+          ? minimumHeight
+          : projectedHeight > upperBoundary
+          ? maximumHeight
+          : defaultHeight;
+      sheetHeight.value = withSpring(target, {
+        damping: 24,
+        stiffness: 240,
+      });
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    height: sheetHeight.value,
+  }));
+
+  const adjustHeight = (direction: 'increase' | 'decrease') => {
+    const nextHeight =
+      direction === 'increase'
+        ? sheetHeight.value + windowHeight * 0.2
+        : sheetHeight.value - windowHeight * 0.2;
+    settleHeight(nextHeight);
+  };
+
   return (
     <Modal
       animationType="fade"
@@ -408,16 +486,40 @@ function PlaceDetailModal({
           style={styles.modalBackdrop}
         />
         {place ? (
-          <View
+          <Animated.View
             style={[
               styles.sheet,
               shadows.deep,
               { backgroundColor: colors.background },
+              sheetStyle,
             ]}
           >
-            <View
-              style={[styles.sheetHandle, { backgroundColor: colors.line }]}
-            />
+            <GestureDetector gesture={dragGesture}>
+              <Animated.View
+                accessibilityActions={[
+                  { name: 'increment', label: '展开地点详情' },
+                  { name: 'decrement', label: '收起地点详情' },
+                ]}
+                accessibilityLabel="拖动调整地点详情高度"
+                accessibilityRole="adjustable"
+                accessible
+                onAccessibilityAction={event => {
+                  if (event.nativeEvent.actionName === 'increment') {
+                    adjustHeight('increase');
+                  } else if (event.nativeEvent.actionName === 'decrement') {
+                    adjustHeight('decrease');
+                  }
+                }}
+                style={styles.sheetHandleArea}
+              >
+                <View
+                  style={[
+                    styles.sheetHandle,
+                    { backgroundColor: colors.line },
+                  ]}
+                />
+              </Animated.View>
+            </GestureDetector>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="关闭地点详情"
@@ -450,12 +552,19 @@ function PlaceDetailModal({
             </View>
             <ScrollView
               contentContainerStyle={styles.fragments}
+              nestedScrollEnabled
               showsVerticalScrollIndicator={false}
+              style={styles.fragmentScroll}
             >
               {place.memories.length ? (
                 place.memories.map(memory => (
-                  <View
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`查看${formatMemoryDate(
+                      memory.writtenAt,
+                    )}的日迹详情`}
                     key={memory.id}
+                    onPress={() => onOpenMemory(memory.id)}
                     style={[
                       styles.fragment,
                       { borderBottomColor: colors.line },
@@ -469,7 +578,15 @@ function PlaceDetailModal({
                     <Text style={[styles.fragmentText, { color: colors.text }]}>
                       {memory.content}
                     </Text>
-                  </View>
+                    <Text
+                      style={[
+                        styles.fragmentArrow,
+                        { color: colors.textFaint },
+                      ]}
+                    >
+                      →
+                    </Text>
+                  </Pressable>
                 ))
               ) : (
                 <Text style={[styles.sheetEmpty, { color: colors.textMuted }]}>
@@ -477,7 +594,7 @@ function PlaceDetailModal({
                 </Text>
               )}
             </ScrollView>
-          </View>
+          </Animated.View>
         ) : null}
       </View>
     </Modal>
@@ -489,9 +606,11 @@ export function FarawayScreen() {
   const { colors } = useTheme();
   const haptics = useHaptics();
   const anonymousId = useSettingsStore(state => state.anonymousId);
+  const toast = useToast();
   const [data, setData] = useState<FarawayViewData>(emptyData);
   const [selectedPlace, setSelectedPlace] = useState<PlaceSummary>();
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
@@ -519,6 +638,17 @@ export function FarawayScreen() {
   const openPlace = (place: PlaceSummary) => {
     haptics.trigger('card');
     setSelectedPlace(place);
+  };
+
+  const openMemory = async (memoryId: string) => {
+    haptics.trigger('card');
+    try {
+      const memory = await getFarawayMemory(memoryId);
+      setSelectedPlace(undefined);
+      setSelectedMemory(memory);
+    } catch {
+      toast.show('这条日迹暂时无法打开');
+    }
   };
 
   return (
@@ -600,6 +730,12 @@ export function FarawayScreen() {
       <PlaceDetailModal
         place={selectedPlace}
         onClose={() => setSelectedPlace(undefined)}
+        onOpenMemory={openMemory}
+      />
+      <MemoryDetailModal
+        memory={selectedMemory}
+        onDeleted={() => load()}
+        onDismiss={() => setSelectedMemory(null)}
       />
     </SafeAreaView>
   );
@@ -881,13 +1017,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(30,25,20,0.5)',
   },
   sheet: {
-    maxHeight: '88%',
     minHeight: 280,
     borderTopLeftRadius: radius.cardLarge,
     borderTopRightRadius: radius.cardLarge,
-    paddingTop: spacing.xl,
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxxl,
+    overflow: 'hidden',
+  },
+  sheetHandleArea: {
+    height: 38,
+    marginHorizontal: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sheetHandle: {
     width: 36,
@@ -911,7 +1052,6 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   sheetHeader: {
-    marginTop: spacing.cardGap,
     marginBottom: spacing.lg,
     paddingBottom: spacing.lg,
     borderBottomWidth: 0.5,
@@ -930,6 +1070,9 @@ const styles = StyleSheet.create({
   fragments: {
     paddingBottom: spacing.xxxl,
   },
+  fragmentScroll: {
+    flex: 1,
+  },
   fragment: {
     paddingVertical: spacing.gap,
     borderBottomWidth: 0.5,
@@ -941,9 +1084,17 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   fragmentText: {
+    paddingRight: spacing.xl,
     fontFamily: fontFamilies.serif,
     fontSize: 14,
     lineHeight: 26.6,
+  },
+  fragmentArrow: {
+    position: 'absolute',
+    top: spacing.gap,
+    right: 2,
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
   },
   sheetEmpty: {
     paddingVertical: spacing.xxl,

@@ -62,3 +62,18 @@ export async function markLetterOpened(letter: Letter) {
     });
   });
 }
+
+export async function deleteLetter({
+  letter,
+  memory,
+}: {
+  letter: Letter;
+  memory: Memory;
+}) {
+  await database.write(async () => {
+    await database.batch(
+      letter.prepareDestroyPermanently(),
+      memory.prepareDestroyPermanently(),
+    );
+  });
+}

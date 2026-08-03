@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Animated, {
@@ -24,11 +24,14 @@ import Svg, {
 import { useToast } from '../../components/Toast';
 import { useHaptics } from '../../hooks/useHaptics';
 import { RootStackParamList } from '../../navigation/RootNavigator';
+import { cancelLetterArrivalNotification } from '../../services/letterNotifications';
+import { removeMediaFile } from '../../services/mediaStorage';
 import { primitiveColors } from '../../tokens/colors';
 import { radius } from '../../tokens/radius';
 import { spacing } from '../../tokens/spacing';
 import { fontFamilies, fontSizes, lineHeights } from '../../tokens/typography';
 import {
+  deleteLetter,
   getLetterDetail,
   LetterWithMemory,
   markLetterOpened,
@@ -145,6 +148,7 @@ export function UnsealScreen() {
   const [loadingError, setLoadingError] = useState(false);
   const [opening, setOpening] = useState(false);
   const [opened, setOpened] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const sealProgress = useSharedValue(0);
   const flapProgress = useSharedValue(0);
@@ -311,6 +315,45 @@ export function UnsealScreen() {
     }, 600);
   };
 
+  const confirmDelete = () => {
+    if (!item || deleting) {
+      return;
+    }
+    Alert.alert(
+      item.letter.status === 'reply' ? '删除这封回信？' : '删除这封信？',
+      '信件内容会永久移除，此操作无法撤销。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除',
+          style: 'destructive',
+          onPress: () => {
+            setDeleting(true);
+            deleteLetter(item)
+              .then(() =>
+                Promise.allSettled([
+                  cancelLetterArrivalNotification(item.letter.id),
+                  removeMediaFile(item.memory.imagePath),
+                  removeMediaFile(item.memory.audioPath),
+                  removeMediaFile(item.memory.inkImagePath),
+                ]),
+              )
+              .then(() => {
+                haptics.trigger('selection');
+                toast.show('信件已删除');
+                goBack();
+              })
+              .catch(error => {
+                console.error('删除信件失败', error);
+                toast.show('信件没有删除，请再试一次');
+              })
+              .finally(() => setDeleting(false));
+          },
+        },
+      ],
+    );
+  };
+
   if (loadingError) {
     return (
       <SafeAreaView style={styles.errorScreen}>
@@ -391,6 +434,15 @@ export function UnsealScreen() {
             {formatDate(item.letter.sentAt)} →{' '}
             {formatDate(item.letter.arriveDate)} · 漂流 {driftDays} 天
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="删除这封信"
+            disabled={deleting}
+            onPress={confirmDelete}
+            style={styles.sealedDelete}
+          >
+            <Text style={styles.sealedDeleteText}>删除这封信</Text>
+          </Pressable>
         </Animated.View>
 
         <Animated.View
@@ -406,6 +458,7 @@ export function UnsealScreen() {
             sourceLabel={sourceLabel}
             onArchive={saveToDaily}
             onBack={goBack}
+            onDelete={confirmDelete}
             onError={toast.show}
             onReply={goToWrite}
           />
@@ -591,6 +644,17 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.englishSerifItalic,
     fontSize: fontSizes.caption,
     letterSpacing: 1.2,
+  },
+  sealedDelete: {
+    minHeight: 44,
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xl,
+  },
+  sealedDeleteText: {
+    color: '#9B5A49',
+    fontFamily: fontFamilies.sans,
+    fontSize: fontSizes.caption,
   },
   openState: {
     position: 'absolute',

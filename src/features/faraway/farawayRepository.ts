@@ -75,3 +75,13 @@ export async function getFarawayData(anonymousId?: string, now = new Date()) {
     now,
   });
 }
+
+export async function getFarawayMemory(memoryId: string) {
+  const memory = await database.get<Memory>('memories').find(memoryId);
+
+  if (memory.deleted || memory.isFutureLetter) {
+    throw new Error('这条日迹已不可用');
+  }
+
+  return memory;
+}
