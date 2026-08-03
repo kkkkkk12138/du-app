@@ -7,6 +7,12 @@ import { detailColors } from './MemoryDetailParts';
 
 export const memoryDetailStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: detailColors.background },
+  exportStage: {
+    position: 'absolute',
+    top: 0,
+    left: -420,
+    width: 360,
+  },
   topBar: {
     height: 48,
     justifyContent: 'center',
@@ -258,6 +264,44 @@ export const memoryDetailStyles = StyleSheet.create({
     color: detailColors.inkLight,
     fontFamily: fontFamilies.serif,
     fontSize: fontSizes.caption,
+  },
+  saveFeedback: {
+    position: 'absolute',
+    right: spacing.page,
+    bottom: 34,
+    width: 184,
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.sm,
+    paddingRight: spacing.md,
+    backgroundColor: detailColors.note,
+    borderWidth: 0.5,
+    borderColor: 'rgba(91,79,68,0.14)',
+    borderRadius: 5,
+    boxShadow: '0 8px 24px rgba(59,50,42,0.18)',
+    zIndex: 30,
+  },
+  saveFeedbackImage: {
+    width: 44,
+    height: 52,
+    backgroundColor: detailColors.background,
+    borderRadius: 2,
+  },
+  saveFeedbackCopy: {
+    flex: 1,
+  },
+  saveFeedbackTitle: {
+    color: detailColors.ink,
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: fontSizes.caption,
+  },
+  saveFeedbackDetail: {
+    color: detailColors.inkLight,
+    marginTop: spacing.xxs,
+    fontFamily: fontFamilies.serif,
+    fontSize: 9,
   },
   androidBottom: {
     paddingBottom: Platform.OS === 'android' ? spacing.lg : 0,

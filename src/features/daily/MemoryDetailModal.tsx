@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import {
   Clipboard,
+  Image,
   Modal,
   PermissionsAndroid,
   Platform,
@@ -25,6 +26,8 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +44,7 @@ import {
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { minimumArrivalDate } from '../newLetter/futureLetterLogic';
 import { formatMemoryTime, parseMemoryTags } from './dailyContext';
+import { MemoryExportCard } from './MemoryExportCard';
 import {
   AudioStrip,
   HandwritingAttachment,
@@ -85,7 +89,10 @@ export function MemoryDetailModal({
     state => state.letterReminderTime,
   );
   const exportRef = useRef<View>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
+  const feedbackOpacity = useSharedValue(0);
+  const feedbackLift = useSharedValue(0);
   const progressRef = useRef(progress);
   const showToastRef = useRef(showToast);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -93,6 +100,7 @@ export function MemoryDetailModal({
   const [stamp, setStamp] = useState<Letter | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [savedPreviewUri, setSavedPreviewUri] = useState<string>();
 
   const tags = useMemo(
     () => parseMemoryTags(memory?.customTags ?? '[]'),
@@ -106,6 +114,15 @@ export function MemoryDetailModal({
   useEffect(() => {
     showToastRef.current = showToast;
   }, [showToast]);
+
+  useEffect(
+    () => () => {
+      if (feedbackTimer.current) {
+        clearTimeout(feedbackTimer.current);
+      }
+    },
+    [],
+  );
 
   const memoryId = memory?.id;
   useEffect(() => {
@@ -152,6 +169,15 @@ export function MemoryDetailModal({
   const headerStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: reduceMotion ? [] : [{ translateY: -10 * (1 - progress.value) }],
+  }));
+  const feedbackStyle = useAnimatedStyle(() => ({
+    opacity: feedbackOpacity.value,
+    transform: reduceMotion
+      ? []
+      : [
+          { translateY: 24 - feedbackLift.value * 42 },
+          { scale: 0.9 + feedbackLift.value * 0.1 },
+        ],
   }));
 
   const close = useCallback(() => {
@@ -301,6 +327,24 @@ export function MemoryDetailModal({
       const imageUri = uri.startsWith('file://') ? uri : `file://${uri}`;
       await CameraRoll.saveAsset(imageUri, { album: '渡', type: 'photo' });
       haptics.trigger('envelopeOpen');
+      setSavedPreviewUri(imageUri);
+      feedbackOpacity.value = 0;
+      feedbackLift.value = 0;
+      feedbackOpacity.value = withSequence(
+        withTiming(1, { duration: reduceMotion ? 120 : 220 }),
+        withDelay(850, withTiming(0, { duration: 280 })),
+      );
+      feedbackLift.value = withTiming(1, {
+        duration: reduceMotion ? 1 : 1200,
+        easing: Easing.out(Easing.cubic),
+      });
+      if (feedbackTimer.current) {
+        clearTimeout(feedbackTimer.current);
+      }
+      feedbackTimer.current = setTimeout(
+        () => setSavedPreviewUri(undefined),
+        1450,
+      );
       showToast('已存为图片');
     } catch (error) {
       console.error('导出记忆图片失败', error);
@@ -327,6 +371,11 @@ export function MemoryDetailModal({
         style={[styles.root, { paddingTop: insets.top }]}
       >
         <PaperTexture />
+        <View pointerEvents="none" style={styles.exportStage}>
+          <View ref={exportRef} collapsable={false}>
+            <MemoryExportCard memory={memory} replies={replies} />
+          </View>
+        </View>
         <Animated.View style={[styles.topBar, headerStyle]}>
           <Pressable
             accessibilityRole="button"
@@ -352,7 +401,7 @@ export function MemoryDetailModal({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View ref={exportRef} collapsable={false} style={styles.exportPage}>
+            <View style={styles.exportPage}>
               <View style={styles.dateHeader}>
                 <View>
                   <Text style={styles.monthYear}>
@@ -545,6 +594,24 @@ export function MemoryDetailModal({
             saveStamp({ arriveOn: date });
           }}
         />
+        {savedPreviewUri ? (
+          <Animated.View
+            accessibilityLiveRegion="polite"
+            accessibilityLabel="图片已保存到相册"
+            pointerEvents="none"
+            style={[styles.saveFeedback, feedbackStyle]}
+          >
+            <Image
+              resizeMode="cover"
+              source={{ uri: savedPreviewUri }}
+              style={styles.saveFeedbackImage}
+            />
+            <View style={styles.saveFeedbackCopy}>
+              <Text style={styles.saveFeedbackTitle}>已存入相册</Text>
+              <Text style={styles.saveFeedbackDetail}>只保留信件内容</Text>
+            </View>
+          </Animated.View>
+        ) : null}
       </View>
     </Modal>
   );

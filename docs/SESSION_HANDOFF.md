@@ -324,8 +324,8 @@ xcodebuild (iPhone 17 Pro simulator, Debug)
 Latest Jest result:
 
 ```text
-14 suites passed
-48 tests passed
+15 suites passed
+50 tests passed
 ```
 
 Stage 7 verification:
@@ -364,6 +364,18 @@ Stage 8 verification:
   `84805`. App-store submission still requires a public HTTPS copy of the
   privacy policy and real store identifiers; the app no longer pretends those
   external resources are configured.
+
+Memory image export verification:
+
+- `存为图` renders a dedicated 360pt content card instead of capturing the
+  visible detail screen.
+- The exported image contains the original memory, meaningful attachments,
+  tags, and full reply text. It excludes navigation, actions, empty reply copy,
+  and future-stamp controls.
+- Saving shows a floating image-preview confirmation with a reduced-motion
+  fallback.
+- Export-content tests cover empty and populated reply states. A clean iOS
+  Debug build installed and launched as process `18930`.
 
 Reminder-time migration verification:
 
