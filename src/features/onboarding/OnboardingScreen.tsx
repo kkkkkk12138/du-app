@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useHaptics } from '../../hooks/useHaptics';
@@ -31,6 +32,12 @@ const pages = [
     body: '写给未来的自己。\n在约定的日子到来前，这封信不会被提前打开。',
   },
   {
+    mark: '例',
+    eyebrow: '先翻几页看看',
+    title: '初见的内容，只作示范',
+    body: '刚开始时，日迹、信、念想与副本中会放入少量参考内容。\n它们都可以删除，也不会影响你之后写下的真实记录。',
+  },
+  {
     mark: '守',
     eyebrow: '只有你能看',
     title: '你的日记，留在本地',
@@ -39,6 +46,7 @@ const pages = [
 ] as const;
 
 export function OnboardingScreen() {
+  const reduceMotion = useReducedMotion();
   const { colors } = useTheme();
   const haptics = useHaptics();
   const completeOnboarding = useSettingsStore(
@@ -180,7 +188,7 @@ export function OnboardingScreen() {
         </Pressable>
       </View>
       <Modal
-        animationType="slide"
+        animationType={reduceMotion ? 'none' : 'slide'}
         onRequestClose={() => setPrivacyOpen(false)}
         presentationStyle="pageSheet"
         visible={privacyOpen}

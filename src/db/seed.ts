@@ -180,6 +180,7 @@ export async function seedDevelopmentData() {
           memory._raw.id = item.id;
           memory.type = item.type;
           memory.content = item.content;
+          memory.status = 'published';
           memory.placeId = item.placeId;
           memory.placeDetail = item.placeDetail;
           memory.bodyTags = '[]';
@@ -374,6 +375,7 @@ export async function seedDevelopmentData() {
     ) => {
       memory.type = item.type;
       memory.content = item.content;
+      memory.status = 'published';
       memory.placeId = item.placeId;
       memory.placeDetail = item.placeDetail;
       memory.audioDuration = item.audioDuration;

@@ -21,7 +21,7 @@ jest.mock('../src/db/database', () => ({
   },
 }));
 
-import {createFutureLetter} from '../src/features/newLetter/futureLetterRepository';
+import { createFutureLetter } from '../src/features/newLetter/futureLetterRepository';
 
 beforeEach(() => {
   mockCollections.memories.length = 0;
@@ -48,6 +48,8 @@ test('creates linked future memory and traveling letter atomically', async () =>
       type: 'audio',
       customTags: '["平静"]',
       isFutureLetter: true,
+      futureArriveAt: new Date(2027, 7, 2, 18, 30),
+      futureArriveType: 'one_year',
       audioPath: '/documents/future.wav',
       letterId: 'letters-1',
     }),
@@ -55,7 +57,7 @@ test('creates linked future memory and traveling letter atomically', async () =>
   expect(result.letter).toEqual(
     expect.objectContaining({
       memoryId: 'memories-1',
-      arriveDate: new Date(2027, 7, 2),
+      arriveDate: new Date(2027, 7, 2, 18, 30),
       arriveType: 'one_year',
       status: 'traveling',
       toType: 'future_self',

@@ -1,3 +1,5 @@
+import type {ArtSkin} from '../store/useSettingsStore';
+
 export const primitiveColors = {
   wood: '#EDE3D2',
   woodDeep: '#D9CCB8',
@@ -48,8 +50,8 @@ export const lightColors: ThemeColors = {
   surfaceAged: primitiveColors.paperAged,
   text: primitiveColors.ink,
   textSoft: primitiveColors.inkSoft,
-  textMuted: primitiveColors.inkLight,
-  textFaint: primitiveColors.inkFaint,
+  textMuted: '#766A60',
+  textFaint: primitiveColors.inkLight,
   accent: primitiveColors.accent,
   accentSoft: primitiveColors.accentSoft,
   seal: primitiveColors.seal,
@@ -64,23 +66,99 @@ export const lightColors: ThemeColors = {
 };
 
 export const darkColors: ThemeColors = {
-  background: '#2A2520',
-  surface: '#3A3028',
-  surfaceWarm: '#2A2520',
-  surfaceAged: '#3A3028',
-  text: '#E8DFD3',
-  textSoft: '#B8A898',
-  textMuted: '#8B7D6F',
-  textFaint: '#8B7D6F',
-  accent: '#D47854',
-  accentSoft: '#D47854',
-  seal: '#D44535',
-  line: 'rgba(255, 255, 255, 0.08)',
-  tabBar: '#2A2520',
+  background: '#1C1917',
+  surface: '#27221F',
+  surfaceWarm: '#211D1A',
+  surfaceAged: '#342D28',
+  text: '#E8E2D6',
+  textSoft: '#D2C8BA',
+  textMuted: '#B8AA98',
+  textFaint: '#9A8D7D',
+  accent: '#E05A47',
+  accentSoft: '#C98272',
+  seal: '#E05A47',
+  line: 'rgba(232, 226, 214, 0.12)',
+  tabBar: '#211D1A',
   toastBackground: 'rgba(245, 237, 224, 0.94)',
   toastText: '#2A2420',
-  sage: primitiveColors.sage,
-  sky: primitiveColors.sky,
-  dusk: primitiveColors.dusk,
-  rose: primitiveColors.rose,
+  sage: '#9EB9A3',
+  sky: '#A9C4D1',
+  dusk: '#E2B477',
+  rose: '#D5A9A0',
 };
+
+const lightSkinOverrides: Record<ArtSkin, Partial<ThemeColors>> = {
+  paper: {},
+  moss: {
+    background: '#F3F4EA',
+    surface: '#FBFCF4',
+    surfaceWarm: '#F3F4EA',
+    surfaceAged: '#E8EBDD',
+    tabBar: '#ECEFE3',
+    accent: '#6F846F',
+    accentSoft: '#A8B7A2',
+    seal: '#7E5B48',
+  },
+  dusk: {
+    background: '#FBF1E8',
+    surface: '#FFF9F3',
+    surfaceWarm: '#FBF1E8',
+    surfaceAged: '#F3E2D4',
+    tabBar: '#F6E9DD',
+    accent: '#AD6847',
+    accentSoft: '#D4A184',
+    seal: '#A64F3D',
+  },
+  indigo: {
+    background: '#F0F3F3',
+    surface: '#FAFCFB',
+    surfaceWarm: '#F0F3F3',
+    surfaceAged: '#E1E8E8',
+    tabBar: '#E8EEEE',
+    accent: '#526F78',
+    accentSoft: '#92AAB0',
+    seal: '#735A56',
+  },
+};
+
+const darkSkinOverrides: Record<ArtSkin, Partial<ThemeColors>> = {
+  paper: {},
+  moss: {
+    background: '#191D19',
+    surface: '#232923',
+    surfaceWarm: '#1E231E',
+    surfaceAged: '#30382F',
+    tabBar: '#1D221D',
+    accent: '#A3B99E',
+    accentSoft: '#7F967B',
+    seal: '#D07A61',
+  },
+  dusk: {
+    background: '#211915',
+    surface: '#2C211C',
+    surfaceWarm: '#261D19',
+    surfaceAged: '#3A2B24',
+    tabBar: '#251C18',
+    accent: '#E19469',
+    accentSoft: '#B87358',
+    seal: '#E36D55',
+  },
+  indigo: {
+    background: '#171C20',
+    surface: '#20282E',
+    surfaceWarm: '#1B2227',
+    surfaceAged: '#2B363D',
+    tabBar: '#1B2227',
+    accent: '#9ABBC4',
+    accentSoft: '#6F929C',
+    seal: '#D77B6E',
+  },
+};
+
+export function getThemeColors(isDark: boolean, artSkin: ArtSkin) {
+  const base = isDark ? darkColors : lightColors;
+  const overrides = isDark
+    ? darkSkinOverrides[artSkin]
+    : lightSkinOverrides[artSkin];
+  return {...base, ...overrides};
+}

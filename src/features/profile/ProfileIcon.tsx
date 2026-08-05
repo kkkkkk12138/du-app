@@ -5,13 +5,15 @@ export type ProfileIconName =
   | 'user'
   | 'year'
   | 'palette'
-  | 'collage'
+  | 'book'
+  | 'scraps'
   | 'bell'
   | 'mail'
   | 'lock'
   | 'moon'
   | 'message'
   | 'star'
+  | 'tea'
   | 'info';
 
 export function ProfileIcon({
@@ -30,7 +32,7 @@ export function ProfileIcon({
   };
 
   return (
-    <Svg width={10} height={10} viewBox="0 0 24 24">
+    <Svg width={14} height={14} viewBox="0 0 24 24">
       {name === 'user' ? (
         <>
           <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" {...common} />
@@ -55,12 +57,22 @@ export function ProfileIcon({
           />
         </>
       ) : null}
-      {name === 'collage' ? (
+      {name === 'book' ? (
         <>
-          <Rect x={3} y={3} width={7} height={7} rx={1} {...common} />
-          <Rect x={14} y={3} width={7} height={7} rx={1} {...common} />
-          <Rect x={3} y={14} width={7} height={7} rx={1} {...common} />
-          <Rect x={14} y={14} width={7} height={7} {...common} />
+          <Path
+            d="M4 4.5A2.5 2.5 0 0 1 6.5 2H11v18H6.5A2.5 2.5 0 0 0 4 22z"
+            {...common}
+          />
+          <Path
+            d="M20 4.5A2.5 2.5 0 0 0 17.5 2H13v18h4.5A2.5 2.5 0 0 1 20 22z"
+            {...common}
+          />
+        </>
+      ) : null}
+      {name === 'scraps' ? (
+        <>
+          <Rect x={4} y={5} width={13} height={15} rx={1} {...common} />
+          <Path d="M8 2h12v15M7 9h7M7 13h6M7 17h4" {...common} />
         </>
       ) : null}
       {name === 'bell' ? (
@@ -95,6 +107,19 @@ export function ProfileIcon({
           points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"
           {...common}
         />
+      ) : null}
+      {name === 'tea' ? (
+        <>
+          <Path
+            d="M5 8h12l-1 8a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3L5 8z"
+            {...common}
+          />
+          <Path d="M17 10h2a2 2 0 0 1 0 4h-2M4 20h14" {...common} />
+          <Path
+            d="M8.5 5c-.5 1-1 1.5 0 3M12 5c-.5 1-1 1.5 0 3M15.5 5c-.5 1-1 1.5 0 3"
+            {...common}
+          />
+        </>
       ) : null}
       {name === 'info' ? (
         <>

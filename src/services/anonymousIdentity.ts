@@ -91,6 +91,7 @@ async function ensureSettingsRecord(anonymousId: string) {
       settings._raw.id = settingsRecordId;
       settings.userId = anonymousId;
       settings.themeMode = 'system';
+      settings.artSkin = 'paper';
       settings.dailyReminderOn = false;
       settings.dailyReminderTime = '22:30';
       settings.letterReminderOn = true;

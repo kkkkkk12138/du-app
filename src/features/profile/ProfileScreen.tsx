@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActionSheetIOS,
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -43,10 +44,13 @@ import { formatReminderTime, reminderTimeToDate } from './reminderTimeLogic';
 const emptyProfile: ProfileData = {
   nickname: '渡河人',
   avatarChar: '渡',
+  avatarPath: undefined,
   daysSinceJoining: 1,
   memoryCount: 0,
   placeCount: 0,
   letterCount: 0,
+  questCount: 0,
+  wishCount: 0,
 };
 
 const themeLabels: Record<ThemeMode, string> = {
@@ -55,6 +59,13 @@ const themeLabels: Record<ThemeMode, string> = {
   dark: '深色',
 };
 
+const skinLabels = {
+  paper: '素纸',
+  moss: '苔痕',
+  dusk: '暮霞',
+  indigo: '靛青',
+} as const;
+
 const iconTones: Record<
   ProfileIconName,
   { backgroundColor: string; color: string }
@@ -62,14 +73,32 @@ const iconTones: Record<
   user: { backgroundColor: 'rgba(58,51,45,0.06)', color: '#6B5F55' },
   year: { backgroundColor: 'rgba(201,155,146,0.15)', color: '#A07068' },
   palette: { backgroundColor: 'rgba(184,92,56,0.10)', color: '#B85C38' },
-  collage: { backgroundColor: 'rgba(154,184,200,0.10)', color: '#6B5F55' },
+  book: { backgroundColor: 'rgba(196,167,125,0.15)', color: '#8B7355' },
+  scraps: { backgroundColor: 'rgba(155,176,196,0.13)', color: '#647F91' },
   bell: { backgroundColor: 'rgba(154,184,200,0.12)', color: '#5A7B8A' },
   mail: { backgroundColor: 'rgba(201,155,146,0.12)', color: '#A07068' },
   lock: { backgroundColor: 'rgba(58,51,45,0.06)', color: '#6B5F55' },
   moon: { backgroundColor: 'rgba(139,115,85,0.08)', color: '#8B7355' },
   message: { backgroundColor: 'rgba(184,92,56,0.08)', color: '#B85C38' },
   star: { backgroundColor: 'rgba(217,162,107,0.12)', color: '#B8864B' },
+  tea: { backgroundColor: 'rgba(212,165,116,0.18)', color: '#B8864B' },
   info: { backgroundColor: 'rgba(139,115,85,0.08)', color: '#8B7355' },
+};
+
+const rowRotations: Record<ProfileIconName, string> = {
+  user: '-0.6deg',
+  year: '0.5deg',
+  palette: '-0.8deg',
+  book: '0.4deg',
+  scraps: '-0.5deg',
+  bell: '0.6deg',
+  mail: '-0.5deg',
+  lock: '0.4deg',
+  moon: '-0.7deg',
+  message: '0.6deg',
+  star: '-0.6deg',
+  tea: '0.5deg',
+  info: '-0.8deg',
 };
 
 export function ProfileScreen() {
@@ -198,38 +227,86 @@ export function ProfileScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="编辑个人资料"
-          onPress={() => navigation.navigate('ProfileEdit')}
-          style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
-        >
+        <View style={styles.hero}>
+          <View style={[styles.heroSeal, { backgroundColor: colors.seal }]}>
+            <Text style={styles.heroSealText}>渡</Text>
+          </View>
           <View
-            style={[
+            pointerEvents="none"
+            style={[styles.inkDot, styles.inkDotOne]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.inkDot, styles.inkDotTwo]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.inkDot, styles.inkDotThree]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="编辑个人资料"
+            onPress={() => navigation.navigate('ProfileEdit')}
+            style={({ pressed }) => [
               styles.avatar,
-              { backgroundColor: colors.surface, borderColor: colors.line },
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.line,
+                opacity: pressed ? 0.72 : 1,
+              },
             ]}
           >
-            <Text style={[styles.avatarText, { color: colors.textSoft }]}>
-              {profile.avatarChar}
-            </Text>
-          </View>
-          <View style={styles.identityText}>
-            <Text style={[styles.name, { color: colors.text }]}>
-              {profile.nickname}
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.textFaint }]}>
-              已渡过 {profile.daysSinceJoining} 天 · 渡号{' '}
-              {settings.duNumber ?? '准备中'}
-            </Text>
-          </View>
-          <Chevron />
-        </Pressable>
+            {profile.avatarPath ? (
+              <Image
+                accessibilityLabel={`${profile.nickname}的头像`}
+                resizeMode="cover"
+                source={{ uri: `file://${profile.avatarPath}` }}
+                style={StyleSheet.absoluteFill}
+              />
+            ) : (
+              <Text style={[styles.avatarText, { color: colors.textSoft }]}>
+                {profile.avatarChar}
+              </Text>
+            )}
+          </Pressable>
+          <Text style={[styles.name, { color: colors.text }]}>
+            {profile.nickname}
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textFaint }]}>
+            No.{settings.duNumber ?? '准备中'} · 已渡过{' '}
+            {profile.daysSinceJoining} 天
+          </Text>
+          <View style={[styles.heroRule, { borderBottomColor: colors.line }]} />
+        </View>
 
-        <Section>
+        <View style={styles.stamps}>
+          <StatStamp
+            label="信·已拆"
+            value={profile.letterCount}
+            onPress={() => navigation.navigate('Main', { screen: 'Letters' })}
+          />
+          <StatStamp
+            label="念想"
+            value={profile.wishCount}
+            onPress={() => navigation.navigate('Main', { screen: 'Faraway' })}
+          />
+          <StatStamp
+            label="副本"
+            value={profile.questCount}
+            onPress={() => navigation.navigate('Main', { screen: 'Faraway' })}
+          />
+          <StatStamp
+            label="城·足迹"
+            value={profile.placeCount}
+            onPress={() => navigation.navigate('Main', { screen: 'Faraway' })}
+          />
+        </View>
+
+        <Section english="notes" title="手记">
           <SettingRow
             icon="user"
             label="个人资料"
+            large
             onPress={() => navigation.navigate('ProfileEdit')}
           />
           <SettingRow
@@ -241,15 +318,19 @@ export function ProfileScreen() {
           <SettingRow
             icon="palette"
             label="艺术皮肤"
-            badge="待开发"
-            onPress={() => toast.show('更多艺术皮肤正在设计中')}
+            large
+            value={skinLabels[settings.artSkin]}
+            onPress={() => navigation.navigate('ArtSkin')}
           />
           <SettingRow
-            icon="collage"
-            label="拼贴本"
-            badge="即将上线"
-            last
-            onPress={() => toast.show('即将上线')}
+            icon="book"
+            label="书架"
+            onPress={() => navigation.navigate('Bookshelf')}
+          />
+          <SettingRow
+            icon="scraps"
+            label="散页"
+            onPress={() => navigation.navigate('Scraps')}
           />
         </Section>
 
@@ -286,19 +367,33 @@ export function ProfileScreen() {
           />
         </Section>
 
-        <Section>
+        <Section title="支持与关于">
           <SettingRow
             icon="message"
             label="意见反馈"
             onPress={() => navigation.navigate('Feedback')}
           />
-          {appMetadata.appStoreId ? (
-            <SettingRow
-              icon="star"
-              label="给渡评分"
-              onPress={() => toast.show('感谢支持')}
-            />
-          ) : null}
+          <SettingRow
+            icon="star"
+            label="给渡评分"
+            value={appMetadata.appStoreId ? undefined : '上架后开放'}
+            onPress={() =>
+              toast.show(
+                appMetadata.appStoreId ? '感谢支持' : 'App Store 上架后开放',
+              )
+            }
+          />
+          <SettingRow
+            badge="暂未开放"
+            icon="tea"
+            label="给渡添一杯茶"
+            onPress={() => toast.show('支持入口尚未开放')}
+          />
+          <SettingRow
+            icon="mail"
+            label="作者的信"
+            onPress={() => navigation.navigate('AuthorLetter')}
+          />
           <SettingRow
             icon="info"
             label="关于渡"
@@ -306,9 +401,16 @@ export function ProfileScreen() {
             onPress={() => navigation.navigate('About')}
           />
         </Section>
-        <Text style={[styles.footer, { color: colors.textFaint }]}>
-          渡 · DU
-        </Text>
+        <View style={styles.footer}>
+          <View style={[styles.footerSeal, { borderColor: colors.accent }]}>
+            <Text style={[styles.footerSealText, { color: colors.accent }]}>
+              渡
+            </Text>
+          </View>
+          <Text style={[styles.footerText, { color: colors.textFaint }]}>
+            made with paper & ink
+          </Text>
+        </View>
       </ScrollView>
 
       <DatePicker
@@ -335,24 +437,66 @@ export function ProfileScreen() {
   );
 }
 
+function StatStamp({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}${value}`}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.statStamp,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.line,
+          opacity: pressed ? 0.72 : 1,
+        },
+      ]}
+    >
+      <Text style={[styles.statNumber, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textFaint }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function Section({
   title,
+  english,
   children,
 }: {
   title?: string;
+  english?: string;
   children: React.ReactNode;
 }) {
   const { colors } = useTheme();
   return (
     <View style={styles.section}>
       {title ? (
-        <Text style={[styles.sectionTitle, { color: colors.textFaint }]}>
-          {title}
-        </Text>
+        <View style={styles.sectionHeading}>
+          <View
+            style={[styles.sectionRule, { backgroundColor: colors.line }]}
+          />
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+            {title}
+          </Text>
+          {english ? (
+            <Text style={[styles.sectionEnglish, { color: colors.textFaint }]}>
+              {english}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
-      <View style={[styles.group, { backgroundColor: colors.surface }]}>
-        {children}
-      </View>
+      <View style={styles.group}>{children}</View>
     </View>
   );
 }
@@ -363,6 +507,7 @@ function SettingRow({
   value,
   badge,
   last,
+  large,
   toggle,
   onPress,
 }: {
@@ -371,6 +516,7 @@ function SettingRow({
   value?: string;
   badge?: string;
   last?: boolean;
+  large?: boolean;
   toggle?: boolean;
   onPress: () => void;
 }) {
@@ -386,10 +532,20 @@ function SettingRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        { borderBottomColor: colors.line, borderBottomWidth: last ? 0 : 0.3 },
+        large && styles.rowLarge,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.line,
+          marginBottom: last ? 0 : 12,
+          transform: [{ rotate: rowRotations[icon] }],
+        },
         pressed && styles.pressed,
       ]}
     >
+      <View
+        pointerEvents="none"
+        style={[styles.tape, { backgroundColor: colors.accentSoft }]}
+      />
       <View style={[styles.icon, { backgroundColor: tone.backgroundColor }]}>
         <ProfileIcon color={tone.color} name={icon} />
       </View>
@@ -444,57 +600,162 @@ function CompactToggle({ value }: { value: boolean }) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { paddingBottom: 10 },
-  identity: {
-    minHeight: 58,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
+  content: { paddingBottom: 110 },
+  hero: {
+    paddingTop: 38,
+    paddingHorizontal: 28,
+    paddingBottom: 28,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  heroSeal: {
+    position: 'absolute',
+    top: 34,
+    right: 28,
+    width: 36,
+    height: 36,
+    borderRadius: 3,
+    transform: [{ rotate: '-5deg' }],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroSealText: {
+    color: '#F5EDE0',
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 17,
+  },
+  inkDot: { position: 'absolute', borderRadius: 20 },
+  inkDotOne: {
+    top: 74,
+    left: '34%',
+    width: 4,
+    height: 4,
+    backgroundColor: 'rgba(58,51,45,0.1)',
+  },
+  inkDotTwo: {
+    top: 126,
+    left: '64%',
+    width: 7,
+    height: 7,
+    backgroundColor: 'rgba(184,92,56,0.07)',
+  },
+  inkDotThree: {
+    top: 166,
+    left: '29%',
+    width: 3,
+    height: 3,
+    backgroundColor: 'rgba(139,115,85,0.12)',
+  },
+  avatar: {
+    width: 76,
+    height: 76,
+    marginBottom: 18,
+    borderRadius: 38,
+    borderWidth: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarText: { fontFamily: fontFamilies.serif, fontSize: 30 },
+  name: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 24,
+    letterSpacing: 5,
+    fontWeight: '400',
+  },
+  subtitle: {
+    marginTop: 7,
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 10,
+    letterSpacing: 1.4,
+  },
+  heroRule: {
+    width: '76%',
+    marginTop: 24,
+    borderBottomWidth: 0.5,
+    borderStyle: 'dashed',
+  },
+  stamps: {
+    paddingHorizontal: 28,
+    paddingBottom: 22,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+  },
+  statStamp: {
+    minHeight: 62,
+    flex: 1,
+    maxWidth: 76,
+    paddingVertical: 10,
+    borderWidth: 0.5,
+    borderStyle: 'dashed',
+    borderRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statNumber: {
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 21,
+    lineHeight: 23,
+  },
+  statLabel: {
+    marginTop: 4,
+    fontFamily: fontFamilies.serif,
+    fontSize: 9,
+    letterSpacing: 1.5,
+  },
+  section: { marginHorizontal: 28, marginBottom: 16 },
+  sectionHeading: {
+    marginBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 0.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontFamily: fontFamilies.serif, fontSize: 16 },
-  identityText: { flex: 1, minWidth: 0 },
-  name: {
-    fontFamily: fontFamilies.serif,
-    fontSize: 15,
-    lineHeight: 18,
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    marginTop: 2,
-    fontFamily: fontFamilies.sans,
-    fontSize: 9.5,
-    letterSpacing: 0.3,
-  },
-  section: { marginHorizontal: 16, marginBottom: 10 },
+  sectionRule: { width: 20, height: 0.5 },
   sectionTitle: {
-    paddingLeft: 4,
-    paddingBottom: 4,
-    fontFamily: fontFamilies.sans,
-    fontSize: 9,
-    letterSpacing: 1.5,
+    fontFamily: fontFamilies.serif,
+    fontSize: 11,
+    letterSpacing: 5,
   },
-  group: { borderRadius: 9, overflow: 'hidden' },
+  sectionEnglish: {
+    marginLeft: 'auto',
+    fontFamily: fontFamilies.englishSerifItalic,
+    fontSize: 10,
+    letterSpacing: 2,
+  },
+  group: { overflow: 'visible' },
   row: {
-    height: 35,
-    paddingHorizontal: 11,
+    minHeight: 54,
+    paddingHorizontal: 16,
+    borderWidth: 0.5,
+    borderRadius: 3,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 12,
+    position: 'relative',
+    shadowColor: primitiveColors.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.025,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  rowLarge: {
+    minHeight: 60,
+    paddingHorizontal: 18,
+  },
+  tape: {
+    position: 'absolute',
+    top: -6,
+    left: '44%',
+    width: 38,
+    height: 12,
+    borderRadius: 1,
+    opacity: 0.24,
+    transform: [{ rotate: '-1deg' }],
   },
   icon: {
-    width: 20,
-    height: 20,
+    width: 28,
+    height: 28,
     borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
@@ -502,13 +763,14 @@ const styles = StyleSheet.create({
   rowLabel: {
     flex: 1,
     minWidth: 0,
-    fontFamily: fontFamilies.sans,
-    fontSize: 12,
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+    letterSpacing: 0.4,
   },
   rowValue: {
     maxWidth: 130,
     fontFamily: fontFamilies.sans,
-    fontSize: 10.5,
+    fontSize: 10,
     textAlign: 'right',
   },
   badge: {
@@ -545,9 +807,27 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   footer: {
-    paddingTop: 6,
+    paddingTop: 28,
+    paddingBottom: 10,
+    alignItems: 'center',
+  },
+  footerSeal: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 3,
+    transform: [{ rotate: '-4deg' }],
+  },
+  footerSealText: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 13,
+  },
+  footerText: {
+    marginTop: 8,
     textAlign: 'center',
-    fontFamily: fontFamilies.sans,
+    fontFamily: fontFamilies.englishSerif,
     fontSize: 7.5,
     letterSpacing: 2,
     opacity: 0.5,

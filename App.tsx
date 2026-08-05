@@ -5,6 +5,7 @@ import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import {AppBootstrap} from './src/components/AppBootstrap';
+import {OverlayHostProvider} from './src/components/OverlayHost';
 import {ToastProvider} from './src/components/Toast';
 import {database} from './src/db/database';
 import {RootNavigator} from './src/navigation/RootNavigator';
@@ -17,9 +18,11 @@ function App() {
         <DatabaseProvider database={database}>
           <ThemeProvider>
             <ToastProvider>
-              <AppBootstrap>
-                <RootNavigator />
-              </AppBootstrap>
+              <OverlayHostProvider>
+                <AppBootstrap>
+                  <RootNavigator />
+                </AppBootstrap>
+              </OverlayHostProvider>
             </ToastProvider>
           </ThemeProvider>
         </DatabaseProvider>

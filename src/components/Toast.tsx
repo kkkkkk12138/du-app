@@ -10,6 +10,7 @@ import React, {
 import {StyleSheet, Text} from 'react-native';
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
@@ -28,15 +29,18 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function ToastProvider({children}: PropsWithChildren) {
   const {colors} = useTheme();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const [message, setMessage] = useState('');
   const opacity = useSharedValue(0);
-  const translateY = useSharedValue(20);
+  const translateY = useSharedValue(reduceMotion ? 0 : 20);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hide = useCallback(() => {
-    opacity.value = withTiming(0, {duration: 300});
-    translateY.value = withTiming(20, {duration: 300});
-  }, [opacity, translateY]);
+    opacity.value = withTiming(0, {duration: reduceMotion ? 1 : 300});
+    translateY.value = withTiming(reduceMotion ? 0 : 20, {
+      duration: reduceMotion ? 1 : 300,
+    });
+  }, [opacity, reduceMotion, translateY]);
 
   const show = useCallback(
     (nextMessage: string, duration = 3000) => {
@@ -45,11 +49,11 @@ export function ToastProvider({children}: PropsWithChildren) {
       }
 
       setMessage(nextMessage);
-      opacity.value = withTiming(1, {duration: 300});
-      translateY.value = withTiming(0, {duration: 300});
+      opacity.value = withTiming(1, {duration: reduceMotion ? 1 : 300});
+      translateY.value = withTiming(0, {duration: reduceMotion ? 1 : 300});
       timer.current = setTimeout(hide, duration);
     },
-    [hide, opacity, translateY],
+    [hide, opacity, reduceMotion, translateY],
   );
 
   useEffect(

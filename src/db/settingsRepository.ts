@@ -1,11 +1,12 @@
 import {Q} from '@nozbe/watermelondb';
 
-import type {ThemeMode} from '../store/useSettingsStore';
+import type {ArtSkin, ThemeMode} from '../store/useSettingsStore';
 import {database} from './database';
 import {Setting} from './models';
 
 export type SettingsSnapshot = {
   themeMode: ThemeMode;
+  artSkin: ArtSkin;
   dailyReminderOn: boolean;
   dailyReminderTime: string;
   letterReminderOn: boolean;
@@ -30,6 +31,7 @@ export async function saveSettingsSnapshot(snapshot: SettingsSnapshot) {
   await database.write(() =>
     settings.update(record => {
       record.themeMode = snapshot.themeMode;
+      record.artSkin = snapshot.artSkin;
       record.dailyReminderOn = snapshot.dailyReminderOn;
       record.dailyReminderTime = snapshot.dailyReminderTime;
       record.letterReminderOn = snapshot.letterReminderOn;

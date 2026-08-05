@@ -18,13 +18,11 @@ export async function requestLetterNotificationAccess() {
 export async function scheduleLetterArrivalNotification({
   letterId,
   arriveDate,
-  reminderTime = '09:00',
 }: {
   letterId: string;
   arriveDate: Date;
-  reminderTime?: string;
 }) {
-  const notificationDate = getArrivalNotificationDate(arriveDate, reminderTime);
+  const notificationDate = getArrivalNotificationDate(arriveDate);
   if (notificationDate.getTime() <= Date.now()) {
     return false;
   }
@@ -66,6 +64,11 @@ export async function scheduleLetterArrivalNotification({
 
 export async function cancelLetterArrivalNotification(letterId: string) {
   await notifee.cancelNotification(`future-letter-${letterId}`);
+}
+
+export async function isLetterArrivalNotificationScheduled(letterId: string) {
+  const ids = await notifee.getTriggerNotificationIds();
+  return ids.includes(`future-letter-${letterId}`);
 }
 
 export async function cancelAllLetterArrivalNotifications() {

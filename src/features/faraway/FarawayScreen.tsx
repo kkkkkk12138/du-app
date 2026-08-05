@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,12 +13,14 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import Svg, { Circle, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
 
+import { OverlayPortal } from '../../components/OverlayHost';
 import { useToast } from '../../components/Toast';
 import { Memory } from '../../db/models';
 import { useHaptics } from '../../hooks/useHaptics';
@@ -32,7 +33,12 @@ import { spacing } from '../../tokens/spacing';
 import { fontFamilies, fontSizes, lineHeights } from '../../tokens/typography';
 import { MemoryDetailModal } from '../daily/MemoryDetailModal';
 import { FarawayViewData, PlaceSummary } from './farawayLogic';
+import { FARAWAY_VIEWS, FarawayView } from './farawayNavigation';
 import { getFarawayData, getFarawayMemory } from './farawayRepository';
+import { getQuestAggregates } from './questRepository';
+import { QuestSection } from './QuestSection';
+import { getWishes } from './wishRepository';
+import { WishSection } from './WishSection';
 
 type FarawayNavigation = BottomTabNavigationProp<MainTabParamList, 'Faraway'>;
 
@@ -41,7 +47,6 @@ const emptyData: FarawayViewData = {
   cityCount: 0,
   locatedMemoryCount: 0,
 };
-
 function formatMemoryDate(date: Date) {
   return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()}`;
 }
@@ -58,146 +63,33 @@ function SectionTitle({ children }: { children: string }) {
   );
 }
 
-function MountainHero({ data }: { data: FarawayViewData }) {
-  const { colors, isDark } = useTheme();
-  const dotColors = [
-    data.current?.colorHex,
-    data.hometown?.colorHex,
-    ...data.visited.map(place => place.colorHex),
-  ].filter((color): color is string => Boolean(color));
-  const dotPositions = [
-    [276, 256],
-    [104, 150],
-    [220, 202],
-    [154, 236],
-    [334, 128],
-    [60, 190],
-    [296, 174],
-  ];
-
+function FootprintChapter() {
   return (
-    <View style={[styles.hero, isDark ? styles.heroDark : styles.heroLight]}>
-      <Svg
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-        viewBox="0 0 390 320"
-      >
-        <Path
-          d="M0 174 Q62 96 124 136 Q184 78 248 126 Q310 86 390 116 L390 320 L0 320 Z"
-          fill={isDark ? '#5A5145' : '#C8C0A8'}
-          opacity={0.3}
-        />
-        <Path
-          d="M0 216 Q82 146 156 186 Q226 126 300 176 Q348 146 390 166 L390 320 L0 320 Z"
-          fill={isDark ? '#6B6153' : '#B0A890'}
-          opacity={0.34}
-        />
-        <Path
-          d="M0 264 Q52 214 124 244 Q184 194 256 234 Q326 204 390 234 L390 320 L0 320 Z"
-          fill={isDark ? '#766B5B' : '#9A9278'}
-          opacity={0.28}
-        />
-        <Path
-          d="M0 282 Q62 272 124 282 T248 282 T390 282"
-          stroke={colors.sky}
-          strokeWidth={0.8}
+    <View style={styles.chapter}>
+      <View style={styles.chapterEyebrow}>
+        <Svg
+          height={16}
+          viewBox="0 0 24 24"
+          width={16}
           fill="none"
-          opacity={0.38}
-        />
-        <Path
-          d="M0 300 Q82 290 164 300 T328 300 T390 300"
-          stroke={colors.sky}
-          strokeWidth={0.6}
-          fill="none"
-          opacity={0.28}
-        />
-        {dotColors.slice(0, dotPositions.length).map((color, index) => {
-          const [cx, cy] = dotPositions[index];
-          const radiusValue = index === 0 ? 5 : index < 3 ? 3 : 2.2;
-          return (
-            <React.Fragment key={`${color}-${index}`}>
-              {index === 0 ? (
-                <Circle
-                  cx={cx}
-                  cy={cy}
-                  r={radiusValue * 2.5}
-                  fill={color}
-                  opacity={0.12}
-                />
-              ) : null}
-              <Circle
-                cx={cx}
-                cy={cy}
-                r={radiusValue}
-                fill={color}
-                opacity={index === 0 ? 0.72 : 0.5}
-              />
-            </React.Fragment>
-          );
-        })}
-        <Path
-          d="M282 288 L292 278 L292 288 Z M282 288 H298"
-          stroke={colors.textMuted}
-          strokeWidth={0.8}
-          fill="none"
-          opacity={0.35}
-        />
-      </Svg>
-
-      <View style={styles.heroTitle}>
-        <Text style={[styles.eyebrow, { color: colors.textMuted }]}>
-          DISTANT PLACES
-        </Text>
-        <Text style={[styles.heroHeading, { color: colors.text }]}>
-          你的脚下{'\n'}有
-          <Text style={{ color: colors.accent }}>{data.cityCount}</Text>座城
-        </Text>
-        <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
-          每到一处，便落几笔
-        </Text>
+          stroke="#B85C38"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+        >
+          <Circle cx={12} cy={10} r={3} />
+          <Path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" />
+        </Svg>
+        <Text style={styles.chapterEyebrowText}>CHAPTER II</Text>
       </View>
-
-      <View style={styles.heroStats}>
-        <HeroStat value={String(data.cityCount)} label="城" />
-        <HeroDivider />
-        <HeroStat value={String(data.locatedMemoryCount)} label="笔" />
-        {data.yearsLabel ? (
-          <>
-            <HeroDivider />
-            <HeroStat value={data.yearsLabel} />
-          </>
-        ) : null}
-        {data.hometown ? (
-          <>
-            <HeroDivider />
-            <HeroStat value="1" label="故乡" />
-          </>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
-function HeroStat({ value, label }: { value: string; label?: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.heroStat}>
-      <Text style={[styles.heroStatValue, { color: colors.text }]}>
-        {value}
+      <Text style={styles.chapterTitle}>
+        纸上的<Text style={styles.chapterAccent}>足迹</Text>
       </Text>
-      {label ? (
-        <Text style={[styles.heroStatLabel, { color: colors.textMuted }]}>
-          {label}
-        </Text>
-      ) : null}
+      <Text style={styles.chapterSubtitle}>每到一处，便落几笔</Text>
+      <View style={styles.chapterLine}>
+        <View style={styles.chapterLineAccent} />
+      </View>
     </View>
-  );
-}
-
-function HeroDivider() {
-  const { colors } = useTheme();
-  return (
-    <View style={[styles.heroDivider, { backgroundColor: colors.line }]} />
   );
 }
 
@@ -406,6 +298,7 @@ function PlaceDetailModal({
   onOpenMemory: (memoryId: string) => void;
 }) {
   const { colors } = useTheme();
+  const reduceMotion = useReducedMotion();
   const { height: windowHeight } = useWindowDimensions();
   const minimumHeight = Math.max(280, windowHeight * 0.5);
   const defaultHeight = windowHeight * 0.82;
@@ -428,10 +321,12 @@ function PlaceDetailModal({
         : nextHeight > upperBoundary
         ? maximumHeight
         : defaultHeight;
-    sheetHeight.value = withSpring(target, {
-      damping: 24,
-      stiffness: 240,
-    });
+    sheetHeight.value = reduceMotion
+      ? target
+      : withSpring(target, {
+          damping: 24,
+          stiffness: 240,
+        });
   };
 
   const dragGesture = Gesture.Pan()
@@ -454,10 +349,12 @@ function PlaceDetailModal({
           : projectedHeight > upperBoundary
           ? maximumHeight
           : defaultHeight;
-      sheetHeight.value = withSpring(target, {
-        damping: 24,
-        stiffness: 240,
-      });
+      sheetHeight.value = reduceMotion
+        ? target
+        : withSpring(target, {
+            damping: 24,
+            stiffness: 240,
+          });
     });
 
   const sheetStyle = useAnimatedStyle(() => ({
@@ -473,10 +370,9 @@ function PlaceDetailModal({
   };
 
   return (
-    <Modal
-      animationType="fade"
+    <OverlayPortal
+      name="faraway-place-detail"
       onRequestClose={onClose}
-      transparent
       visible={Boolean(place)}
     >
       <View style={styles.modalRoot}>
@@ -513,10 +409,7 @@ function PlaceDetailModal({
                 style={styles.sheetHandleArea}
               >
                 <View
-                  style={[
-                    styles.sheetHandle,
-                    { backgroundColor: colors.line },
-                  ]}
+                  style={[styles.sheetHandle, { backgroundColor: colors.line }]}
                 />
               </Animated.View>
             </GestureDetector>
@@ -597,7 +490,7 @@ function PlaceDetailModal({
           </Animated.View>
         ) : null}
       </View>
-    </Modal>
+    </OverlayPortal>
   );
 }
 
@@ -612,11 +505,40 @@ export function FarawayScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [view, setView] = useState<FarawayView>('places');
+  const [wishCount, setWishCount] = useState(0);
+  const [questCount, setQuestCount] = useState(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
+  const [questFocus, setQuestFocus] = useState<{
+    questId: string;
+    nodeId: string;
+    revision: number;
+  }>();
+  const updateWishCount = useCallback(
+    (count: number) => setWishCount(count),
+    [],
+  );
+  const updateQuestCount = useCallback(
+    (count: number) => setQuestCount(count),
+    [],
+  );
 
   const load = useCallback(async () => {
     try {
       setLoadError(false);
-      setData(await getFarawayData(anonymousId ?? undefined));
+      const userId = anonymousId ?? undefined;
+      const nextData = await getFarawayData(userId);
+      setData(nextData);
+      const [wishes, quests] = await Promise.allSettled([
+        getWishes(userId),
+        getQuestAggregates(userId),
+      ]);
+      if (wishes.status === 'fulfilled') {
+        setWishCount(wishes.value.length);
+      }
+      if (quests.status === 'fulfilled') {
+        setQuestCount(quests.value.length);
+      }
     } catch (error) {
       console.error('远方数据读取失败', error);
       setLoadError(true);
@@ -632,6 +554,7 @@ export function FarawayScreen() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     await load();
+    setRefreshRevision(current => current + 1);
     setRefreshing(false);
   }, [load]);
 
@@ -667,9 +590,82 @@ export function FarawayScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        <MountainHero data={data} />
+        <View style={[styles.viewTabs, { borderBottomColor: colors.line }]}>
+          {FARAWAY_VIEWS.map(([value, label]) => {
+            const count =
+              value === 'places'
+                ? data.cityCount
+                : value === 'wishes'
+                ? wishCount
+                : questCount;
+            return (
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityLabel={`远方${label}`}
+                accessibilityState={{ selected: view === value }}
+                key={value}
+                onPress={() => setView(value)}
+                style={styles.viewTab}
+              >
+                <Text
+                  style={[
+                    styles.viewTabText,
+                    { color: view === value ? colors.text : colors.textMuted },
+                  ]}
+                >
+                  {label}
+                  {count !== undefined ? (
+                    <Text
+                      style={[
+                        styles.viewTabCount,
+                        {
+                          color:
+                            view === value ? colors.accent : colors.textFaint,
+                        },
+                      ]}
+                    >
+                      {' '}
+                      {count}
+                    </Text>
+                  ) : null}
+                </Text>
+                {view === value ? (
+                  <View
+                    style={[
+                      styles.viewTabIndicator,
+                      { backgroundColor: colors.accent },
+                    ]}
+                  />
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
 
-        {loadError ? (
+        {view === 'quests' ? (
+          <QuestSection
+            focusTarget={questFocus}
+            onCountChange={updateQuestCount}
+            refreshRevision={refreshRevision}
+            userId={anonymousId ?? undefined}
+          />
+        ) : view === 'wishes' ? (
+          <WishSection
+            onCountChange={updateWishCount}
+            onOpenQuests={() => setView('quests')}
+            onAttachedToQuest={(questId, nodeId) => {
+              setQuestFocus({
+                questId,
+                nodeId,
+                revision: Date.now(),
+              });
+              setView('quests');
+              setRefreshRevision(current => current + 1);
+            }}
+            refreshRevision={refreshRevision}
+            userId={anonymousId ?? undefined}
+          />
+        ) : loadError ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
               暂时没能翻开旅途记录，下拉再试一次。
@@ -683,6 +679,7 @@ export function FarawayScreen() {
           </View>
         ) : (
           <>
+            <FootprintChapter />
             {data.current ? (
               <>
                 <SectionTitle>现在停驻</SectionTitle>
@@ -721,9 +718,6 @@ export function FarawayScreen() {
                 </View>
               </>
             ) : null}
-            <Text style={[styles.endMark, { color: colors.textFaint }]}>
-              —— {data.cityCount} 座城，{data.locatedMemoryCount} 笔痕迹 ——
-            </Text>
           </>
         )}
       </ScrollView>
@@ -748,65 +742,80 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.pageBottom + spacing.xxl,
   },
-  hero: {
-    height: 320,
-    overflow: 'hidden',
+  chapter: {
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 14,
   },
-  heroLight: {
-    backgroundColor: '#E8E0CE',
-  },
-  heroDark: {
-    backgroundColor: '#302A24',
-  },
-  heroTitle: {
-    position: 'absolute',
-    top: spacing.xxl,
-    left: spacing.greeting,
-    right: spacing.greeting,
-  },
-  eyebrow: {
-    marginBottom: spacing.sm,
-    fontFamily: fontFamilies.sans,
-    fontSize: 10,
-    letterSpacing: 3,
-  },
-  heroHeading: {
-    fontFamily: fontFamilies.serif,
-    fontSize: 28,
-    lineHeight: 38,
-  },
-  heroSubtitle: {
-    marginTop: spacing.sm,
-    fontFamily: fontFamilies.serif,
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-  heroStats: {
-    position: 'absolute',
-    left: spacing.greeting,
-    right: spacing.greeting,
-    bottom: spacing.lg,
+  chapterEyebrow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.gap,
+    gap: 7,
   },
-  heroStat: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.xs,
-  },
-  heroStatValue: {
+  chapterEyebrowText: {
+    color: '#B85C38',
     fontFamily: fontFamilies.englishSerif,
-    fontSize: fontSizes.statistic,
-    lineHeight: 24,
+    fontSize: 9,
+    letterSpacing: 2.4,
   },
-  heroStatLabel: {
-    fontFamily: fontFamilies.sans,
+  chapterTitle: {
+    marginTop: 6,
+    color: '#3A332D',
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: 2,
+  },
+  chapterAccent: {
+    color: '#B85C38',
+  },
+  chapterSubtitle: {
+    marginTop: 3,
+    color: '#8B7355',
+    fontFamily: fontFamilies.serif,
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  chapterLine: {
+    height: 1,
+    marginTop: 12,
+    backgroundColor: 'rgba(58,51,45,0.1)',
+  },
+  chapterLineAccent: {
+    width: 40,
+    height: 1.5,
+    backgroundColor: '#B85C38',
+  },
+  viewTabs: {
+    minHeight: 46,
+    paddingHorizontal: spacing.greeting,
+    marginBottom: spacing.lg,
+    borderBottomWidth: 0.5,
+    flexDirection: 'row',
+    gap: 28,
+  },
+  viewTab: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  viewTabText: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 15,
+    letterSpacing: 1,
+  },
+  viewTabCount: {
+    fontFamily: fontFamilies.englishSerif,
     fontSize: 10,
+    letterSpacing: 0,
   },
-  heroDivider: {
-    width: 0.5,
-    height: 20,
+  viewTabIndicator: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -0.5,
+    height: 1.5,
   },
   sectionHeading: {
     marginTop: spacing.xxl,
@@ -986,13 +995,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     fontFamily: fontFamilies.sans,
     fontSize: 9,
-  },
-  endMark: {
-    paddingVertical: spacing.xxl,
-    textAlign: 'center',
-    fontFamily: fontFamilies.sans,
-    fontSize: fontSizes.caption,
-    letterSpacing: 2,
   },
   emptyState: {
     paddingHorizontal: 40,

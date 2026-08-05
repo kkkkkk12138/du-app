@@ -10,10 +10,12 @@ import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import BootSplash from 'react-native-bootsplash';
 
 import { verifyMemoryRoundTrip } from '../db/memoryRepository';
+import { seedProductExamples } from '../db/productExamples';
 import { saveSettingsSnapshot } from '../db/settingsRepository';
 import { seedDevelopmentData } from '../db/seed';
 import { OnboardingScreen } from '../features/onboarding/OnboardingScreen';
 import { initializeAnonymousIdentity } from '../services/anonymousIdentity';
+import { runForegroundDataMaintenance } from '../services/appLifecycle';
 import { verifyBiometricLock } from '../services/biometricLock';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useTheme } from '../theme/useTheme';
@@ -35,6 +37,7 @@ export function AppBootstrap({ children }: PropsWithChildren) {
   const settingsSnapshot = useMemo(
     () => ({
       themeMode: settingsState.themeMode,
+      artSkin: settingsState.artSkin,
       dailyReminderOn: settingsState.dailyReminderOn,
       dailyReminderTime: settingsState.dailyReminderTime,
       letterReminderOn: settingsState.letterReminderOn,
@@ -46,6 +49,7 @@ export function AppBootstrap({ children }: PropsWithChildren) {
     }),
     [
       settingsState.biometricLockOn,
+      settingsState.artSkin,
       settingsState.dailyReminderOn,
       settingsState.dailyReminderTime,
       settingsState.defaultCity,
@@ -76,8 +80,10 @@ export function AppBootstrap({ children }: PropsWithChildren) {
 
     try {
       await seedDevelopmentData();
-      await verifyMemoryRoundTrip();
       const identity = await initializeAnonymousIdentity();
+      await seedProductExamples(identity.anonymousId);
+      await runForegroundDataMaintenance();
+      await verifyMemoryRoundTrip();
       setIdentity(identity.anonymousId, identity.duNumber);
       setBootstrapState('ready');
     } catch (error) {
@@ -128,6 +134,18 @@ export function AppBootstrap({ children }: PropsWithChildren) {
     });
     return () => subscription.remove();
   }, [lockState, settingsState.biometricLockOn, unlock]);
+
+  useEffect(() => {
+    if (bootstrapState !== 'ready') {
+      return;
+    }
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        runForegroundDataMaintenance().catch(() => undefined);
+      }
+    });
+    return () => subscription.remove();
+  }, [bootstrapState]);
 
   if (bootstrapState === 'error') {
     return (

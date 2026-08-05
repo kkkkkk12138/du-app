@@ -97,13 +97,30 @@ function summarizePlace(
   const tags = Array.from(
     new Set(placeMemories.flatMap(memory => parseTags(memory.customTags))),
   ).slice(0, 3);
+  const oldestMemory = placeMemories[placeMemories.length - 1];
+  const latestMemory = placeMemories[0];
+  const firstVisit = oldestMemory?.writtenAt;
+  const lastVisit =
+    place.type === 'current' ? undefined : latestMemory?.writtenAt;
+  const visitCount = new Set(
+    placeMemories.map(memory => {
+      const date = memory.writtenAt;
+      return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    }),
+  ).size;
+  const activePlace = {
+    ...place,
+    firstVisit,
+    lastVisit,
+    visitCount,
+  };
 
   return {
-    ...place,
+    ...activePlace,
     memories: placeMemories,
-    latestMemory: placeMemories[0],
+    latestMemory,
     tags,
-    dateRange: formatPlaceDateRange(place),
+    dateRange: formatPlaceDateRange(activePlace),
   };
 }
 
@@ -118,7 +135,9 @@ export function buildFarawayViewData({
   memories: FarawayMemory[];
   now?: Date;
 }): FarawayViewData {
-  const summaries = places.map(place => summarizePlace(place, memories));
+  const summaries = places
+    .map(place => summarizePlace(place, memories))
+    .filter(place => place.memories.length > 0);
   const byId = new Map(summaries.map(place => [place.id, place]));
   const currentBase = user?.currentCityId
     ? byId.get(user.currentCityId)
@@ -168,7 +187,7 @@ export function buildFarawayViewData({
         }
       : undefined,
     visited,
-    cityCount: places.length,
+    cityCount: summaries.length,
     locatedMemoryCount: memories.filter(
       memory => memory.placeId && byId.has(memory.placeId),
     ).length,

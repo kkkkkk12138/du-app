@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,11 +13,17 @@ export function AnnualSummaryScreen() {
   const [summary, setSummary] = useState<AnnualSummary>();
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    getAnnualSummary()
+  const load = useCallback(() => {
+    setFailed(false);
+    setSummary(undefined);
+    return getAnnualSummary()
       .then(setSummary)
       .catch(() => setFailed(true));
   }, []);
+
+  useEffect(() => {
+    load().catch(() => undefined);
+  }, [load]);
 
   const empty = summary?.memoryCount === 0 && summary.letterCount === 0;
 
@@ -48,9 +54,19 @@ export function AnnualSummaryScreen() {
         </Text>
 
         {failed ? (
-          <Text style={[styles.empty, { color: colors.textMuted }]}>
-            年度数据暂时无法读取
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="重新读取年度数据"
+            onPress={() => load().catch(() => undefined)}
+            style={styles.errorState}
+          >
+            <Text style={[styles.emptyTitle, { color: colors.textMuted }]}>
+              年度数据暂时无法读取
+            </Text>
+            <Text style={[styles.retry, { color: colors.accent }]}>
+              轻触重试
+            </Text>
+          </Pressable>
         ) : !summary ? (
           <Text style={[styles.empty, { color: colors.textMuted }]}>
             正在翻阅这一年的纸页…
@@ -180,6 +196,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: fontFamilies.serif,
     fontSize: 13,
+  },
+  errorState: { marginTop: 80 },
+  emptyTitle: {
+    textAlign: 'center',
+    fontFamily: fontFamilies.serif,
+    fontSize: 13,
+  },
+  retry: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
   },
   stats: {
     marginTop: 28,

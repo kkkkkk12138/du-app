@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { LetterWithMemory } from '../letters/lettersRepository';
 import {
@@ -12,6 +11,12 @@ import {
 } from '../daily/MemoryDetailParts';
 import { spacing } from '../../tokens/spacing';
 import { fontFamilies, fontSizes } from '../../tokens/typography';
+import {
+  handwrittenLetterGreeting,
+  handwrittenLetterText,
+  LETTER_TEXT_LINE_HEIGHT,
+  startsWithLetterSalutation,
+} from '../letters/letterTextStyle';
 
 type LetterReadingViewProps = {
   item: LetterWithMemory;
@@ -22,6 +27,10 @@ type LetterReadingViewProps = {
   onDelete: () => void;
   onError: (message: string) => void;
 };
+
+const LETTER_LINE_HEIGHT = LETTER_TEXT_LINE_HEIGHT;
+const LETTER_MIN_RULES = 16;
+const LETTER_RULE_TOP = 9;
 
 function formatDate(date: Date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(
@@ -49,34 +58,38 @@ export function LetterReadingView({
 }: LetterReadingViewProps) {
   const isReply = item.letter.status === 'reply';
   const paragraphs = splitLetter(item.memory.content);
+  const hasWrittenSalutation = startsWithLetterSalutation(
+    item.memory.content,
+  );
   const hasPhoto = Boolean(item.memory.imagePath || item.memory.photoTone);
+  const [ruleCount, setRuleCount] = useState(LETTER_MIN_RULES);
 
   return (
     <View style={styles.screen}>
       <PaperTexture />
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.toolbar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`返回${sourceLabel}`}
-            hitSlop={8}
-            onPress={onBack}
-            style={({ pressed }) => [
-              styles.backButton,
-              { opacity: pressed ? 0.5 : 1 },
-            ]}
-          >
-            <Text style={styles.backGlyph}>‹</Text>
-            <Text style={styles.backLabel}>{sourceLabel}</Text>
-          </Pressable>
-          <Text style={styles.toolbarTitle}>{isReply ? '回信' : '原信'}</Text>
-          <View style={styles.toolbarBalance} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
+      <View style={styles.toolbar}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`返回${sourceLabel}`}
+          hitSlop={12}
+          onPress={onBack}
+          style={({ pressed }) => [
+            styles.backButton,
+            { opacity: pressed ? 0.5 : 1 },
+          ]}
         >
+          <Text style={styles.backGlyph}>‹</Text>
+          <Text style={styles.backLabel}>收回</Text>
+        </Pressable>
+        <Text style={styles.toolbarTitle}>{isReply ? '回信' : '原信'}</Text>
+        <View style={styles.toolbarBalance} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.letterContent}>
           <View style={styles.letterHead}>
             <Text style={styles.eyebrow}>
               {isReply ? 'A REPLY KEPT IN TIME' : 'A LETTER ACROSS TIME'}
@@ -90,12 +103,32 @@ export function LetterReadingView({
             </Text>
           </View>
 
-          <View style={styles.letterPaper}>
-            <View style={styles.tape} />
+          <View
+            onLayout={event => {
+              const count = Math.max(
+                LETTER_MIN_RULES,
+                Math.ceil(event.nativeEvent.layout.height / LETTER_LINE_HEIGHT),
+              );
+              setRuleCount(current => (current === count ? current : count));
+            }}
+            style={styles.letterPaper}
+            testID="full-letter-paper"
+          >
+            <View
+              pointerEvents="none"
+              style={styles.paperRules}
+              testID="full-letter-rules"
+            >
+              {Array.from({ length: ruleCount }, (_, index) => (
+                <View key={index} style={styles.paperRule} />
+              ))}
+            </View>
             <View style={styles.redThread} />
-            <Text style={styles.salute}>
-              {isReply ? '那时的我，' : `${item.letter.toName}，`}
-            </Text>
+            {!hasWrittenSalutation ? (
+              <Text style={styles.salute}>
+                {isReply ? '那时的我，' : `${item.letter.toName}，`}
+              </Text>
+            ) : null}
             {paragraphs.map((paragraph, index) => (
               <Text key={`${index}-${paragraph}`} style={styles.paragraph}>
                 {paragraph}
@@ -131,7 +164,9 @@ export function LetterReadingView({
               </Text>
             </View>
           </View>
+        </View>
 
+        <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="写封回信"
@@ -166,15 +201,14 @@ export function LetterReadingView({
           >
             <Text style={styles.deleteText}>删除这封信</Text>
           </Pressable>
-        </ScrollView>
-      </SafeAreaView>
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: detailColors.background },
-  safeArea: { flex: 1 },
+  screen: { flex: 1, backgroundColor: detailColors.note },
   toolbar: {
     minHeight: 52,
     flexDirection: 'row',
@@ -182,6 +216,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     zIndex: 50,
+    elevation: 8,
   },
   backButton: {
     minWidth: 88,
@@ -189,6 +224,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.sm,
+    zIndex: 51,
+    elevation: 9,
   },
   backGlyph: {
     color: detailColors.ink,
@@ -210,14 +247,21 @@ const styles = StyleSheet.create({
   },
   toolbarBalance: { width: 88 },
   content: {
+    flexGrow: 1,
     width: '100%',
-    maxWidth: 540,
+    maxWidth: 600,
     alignSelf: 'center',
-    paddingHorizontal: spacing.page,
-    paddingTop: spacing.lg,
-    paddingBottom: 46,
+    paddingBottom: spacing.sm,
   },
-  letterHead: { paddingHorizontal: spacing.xs, marginBottom: spacing.xl },
+  letterContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+  },
+  letterHead: {
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.xxl,
+  },
   eyebrow: {
     color: detailColors.accent,
     fontFamily: fontFamilies.englishSerif,
@@ -239,50 +283,47 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   letterPaper: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: 38,
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: LETTER_LINE_HEIGHT * LETTER_MIN_RULES,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 16,
     paddingBottom: spacing.xxl,
-    backgroundColor: detailColors.note,
-    borderRadius: 3,
-    boxShadow: '0 8px 26px rgba(72,53,38,0.11)',
+    backgroundColor: 'rgba(255,252,243,0.42)',
   },
-  tape: {
+  paperRules: {
     position: 'absolute',
-    top: -9,
-    left: '39%',
-    width: 82,
-    height: 21,
-    backgroundColor: 'rgba(221,199,159,0.53)',
-    transform: [{ rotate: '-2deg' }],
+    top: LETTER_RULE_TOP,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  paperRule: {
+    height: 1,
+    marginTop: LETTER_LINE_HEIGHT - 1,
+    backgroundColor: 'rgba(112,88,65,0.105)',
   },
   redThread: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: 13,
+    left: 9,
     width: 1,
-    backgroundColor: 'rgba(192,112,74,0.12)',
+    backgroundColor: 'rgba(192,112,74,0.16)',
   },
   salute: {
-    color: detailColors.ink,
-    marginBottom: spacing.lg,
-    fontFamily: fontFamilies.serifMedium,
-    fontSize: 18,
+    ...handwrittenLetterGreeting,
   },
   paragraph: {
-    color: detailColors.ink,
-    marginBottom: spacing.lg,
-    fontFamily: fontFamilies.serif,
-    fontSize: 17,
-    lineHeight: 32,
-    letterSpacing: 0.35,
+    ...handwrittenLetterText,
+    marginBottom: LETTER_LINE_HEIGHT,
   },
   signatureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: spacing.sm,
-    marginTop: spacing.xl,
+    marginTop: LETTER_LINE_HEIGHT,
   },
   signatureLine: {
     width: 24,
@@ -298,8 +339,8 @@ const styles = StyleSheet.create({
     minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xl,
-    paddingHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.xs,
   },
   journeyDot: {
     width: 5,
@@ -324,6 +365,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxs,
     fontFamily: fontFamilies.serif,
     fontSize: fontSizes.caption,
+  },
+  actions: {
+    marginTop: spacing.xxl,
+    marginHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(114, 86, 62, 0.18)',
   },
   primaryAction: {
     minHeight: 56,

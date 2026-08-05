@@ -2,8 +2,15 @@ import {Q} from '@nozbe/watermelondb';
 
 import {database} from './database';
 import {Memory} from './models';
+import {
+  finalizePreparedMedia,
+  prepareMediaForPersistence,
+  PreparedMediaFile,
+  rollbackPreparedMedia,
+} from '../services/mediaStorage';
 
 export type CreateMemoryInput = {
+  draftId?: string;
   content: string;
   type?: string;
   writtenAt?: Date;
@@ -17,28 +24,65 @@ export type CreateMemoryInput = {
 };
 
 export async function createMemory(input: CreateMemoryInput) {
-  return database.write(async () => {
-    const now = Date.now();
+  const prepared: PreparedMediaFile[] = [];
 
-    return database.get<Memory>('memories').create(memory => {
-      memory.type = input.type ?? 'text';
-      memory.content = input.content;
-      memory.placeId = input.placeId;
-      memory.placeDetail = input.placeDetail;
-      memory.imagePath = input.imagePath;
-      memory.audioPath = input.audioPath;
-      memory.audioDuration = input.audioDuration;
-      memory.inkImagePath = input.inkImagePath;
-      memory.bodyTags = '[]';
-      memory.heartTags = '[]';
-      memory.customTags = JSON.stringify(input.customTags ?? []);
-      memory.writtenAt = input.writtenAt ?? new Date(now);
-      memory.createdAt = new Date(now);
-      memory.updatedAt = new Date(now);
-      memory.isFutureLetter = false;
-      memory.deleted = false;
+  try {
+    prepared.push(
+      await prepareMediaForPersistence(input.imagePath, 'photo', 'jpg'),
+    );
+    prepared.push(
+      await prepareMediaForPersistence(input.audioPath, 'audio', 'wav'),
+    );
+    prepared.push(
+      await prepareMediaForPersistence(input.inkImagePath, 'ink', 'png'),
+    );
+    let draft: Memory | undefined;
+    if (input.draftId) {
+      try {
+        draft = await database.get<Memory>('memories').find(input.draftId);
+      } catch {
+        draft = undefined;
+      }
+    }
+    const memory = await database.write(async () => {
+      const now = Date.now();
+      const apply = (record: Memory) => {
+        record.type = input.type ?? 'text';
+        record.content = input.content;
+        record.status = 'published';
+        record.placeId = input.placeId;
+        record.placeDetail = input.placeDetail;
+        record.imagePath = prepared[0].path;
+        record.audioPath = prepared[1].path;
+        record.audioDuration = input.audioDuration;
+        record.inkImagePath = prepared[2].path;
+        record.bodyTags = '[]';
+        record.heartTags = '[]';
+        record.customTags = JSON.stringify(input.customTags ?? []);
+        record.writtenAt = input.writtenAt ?? new Date(now);
+        record.updatedAt = new Date(now);
+        record.isFutureLetter = false;
+        record.futureArriveAt = undefined;
+        record.futureArriveType = undefined;
+        record.deleted = false;
+      };
+
+      if (draft?.status === 'draft') {
+        await draft.update(apply);
+        return draft;
+      }
+
+      return database.get<Memory>('memories').create(record => {
+        apply(record);
+        record.createdAt = new Date(now);
+      });
     });
-  });
+    await finalizePreparedMedia(prepared);
+    return memory;
+  } catch (error) {
+    await rollbackPreparedMedia(prepared);
+    throw error;
+  }
 }
 
 export async function getRecentMemories(limit = 20) {
@@ -47,6 +91,7 @@ export async function getRecentMemories(limit = 20) {
     .query(
       Q.where('deleted', false),
       Q.where('is_future_letter', false),
+      Q.where('status', Q.notEq('draft')),
       Q.sortBy('written_at', Q.desc),
       Q.take(limit),
     )

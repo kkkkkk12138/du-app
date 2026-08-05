@@ -12,6 +12,18 @@ export type LetterSections = {
   tomorrowCount: number;
 };
 
+export type LetterFilter = 'all' | 'tomorrow' | 'traveling' | 'opened';
+
+const OPENED_LETTER_RULE_SPACING = 32;
+const OPENED_LETTER_MIN_RULES = 24;
+
+export function getOpenedLetterRuleCount(bodyHeight: number) {
+  return Math.max(
+    OPENED_LETTER_MIN_RULES,
+    Math.ceil(bodyHeight / OPENED_LETTER_RULE_SPACING) + 1,
+  );
+}
+
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -73,5 +85,27 @@ export function classifyLetters(
     tomorrowCount: traveling.filter(
       item => daysUntil(item.letter.arriveDate, now) === 1,
     ).length,
+  };
+}
+
+export function filterLetterSections(
+  sections: LetterSections,
+  filter: LetterFilter,
+  now = new Date(),
+) {
+  if (filter === 'tomorrow') {
+    return {
+      arriving: [],
+      traveling: sections.traveling.filter(
+        item => daysUntil(item.letter.arriveDate, now) === 1,
+      ),
+      opened: [],
+    };
+  }
+  return {
+    arriving: filter === 'all' ? sections.arriving : [],
+    traveling:
+      filter === 'all' || filter === 'traveling' ? sections.traveling : [],
+    opened: filter === 'all' || filter === 'opened' ? sections.opened : [],
   };
 }

@@ -49,12 +49,12 @@ export function ReplySheet({
         <TextInput
           accessibilityLabel="回信内容"
           autoFocus
+          defaultValue=""
           multiline
           onChangeText={setContent}
           placeholder="隔着时间，说一句想说的话……"
           placeholderTextColor={detailColors.inkFaint}
           style={styles.replyInput}
-          value={content}
         />
         <Pressable
           accessibilityRole="button"

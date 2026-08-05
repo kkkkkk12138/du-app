@@ -102,6 +102,7 @@ jest.mock('react-native-fs', () => ({
     copyFile: jest.fn().mockResolvedValue(undefined),
     exists: jest.fn().mockResolvedValue(true),
     stat: jest.fn().mockResolvedValue({ size: 32_044 }),
+    readDir: jest.fn().mockResolvedValue([]),
     unlink: jest.fn().mockResolvedValue(undefined),
     writeFile: jest.fn().mockResolvedValue(undefined),
   },
@@ -140,6 +141,10 @@ jest.mock('react-native-keychain', () => ({
 
 jest.mock('react-native-view-shot', () => ({
   captureRef: jest.fn().mockResolvedValue('/tmp/ink.png'),
+}));
+
+jest.mock('react-native-image-picker', () => ({
+  launchImageLibrary: jest.fn().mockResolvedValue({didCancel: true}),
 }));
 
 jest.mock('@react-native-camera-roll/camera-roll', () => ({

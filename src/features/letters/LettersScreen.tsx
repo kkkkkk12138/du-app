@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Alert,
   Pressable,
@@ -11,13 +17,25 @@ import {
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
   CompositeNavigationProp,
+  RouteProp,
   useFocusEffect,
   useNavigation,
+  useRoute,
 } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { OverlayPortal } from '../../components/OverlayHost';
 import { useToast } from '../../components/Toast';
+import { useHaptics } from '../../hooks/useHaptics';
 import {
   MainTabParamList,
   RootStackParamList,
@@ -29,6 +47,16 @@ import { spacing } from '../../tokens/spacing';
 import { fontFamilies, fontSizes } from '../../tokens/typography';
 import { useTheme } from '../../theme/useTheme';
 import {
+  AudioStrip,
+  HandwritingAttachment,
+  Polaroid,
+} from '../daily/MemoryDetailParts';
+import {
+  filterLetterSections,
+  getOpenedLetterRuleCount,
+  LetterFilter,
+} from './letterLogic';
+import {
   daysUntil,
   deleteLetter,
   getLetterProgress,
@@ -36,11 +64,18 @@ import {
   LetterSections,
   LetterWithMemory,
 } from './lettersRepository';
+import {
+  handwrittenLetterGreeting,
+  handwrittenLetterText,
+  LETTER_TEXT_LINE_HEIGHT,
+  startsWithLetterSalutation,
+} from './letterTextStyle';
 
 type LettersNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Letters'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
+type LettersRoute = RouteProp<MainTabParamList, 'Letters'>;
 
 const emptySections: LetterSections = {
   arriving: [],
@@ -48,6 +83,8 @@ const emptySections: LetterSections = {
   opened: [],
   tomorrowCount: 0,
 };
+
+const OPENED_LETTER_MIN_RULES = 24;
 
 function formatDate(date: Date) {
   return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()}`;
@@ -59,15 +96,39 @@ function letterTitle(item: LetterWithMemory) {
     : item.memory.content.slice(0, 18);
 }
 
+function splitLetterParagraphs(content: string) {
+  const explicit = content
+    .split(/\n+/)
+    .map(paragraph => paragraph.trim())
+    .filter(Boolean);
+  if (explicit.length > 1) {
+    return explicit;
+  }
+  const sentences = content
+    .split(/(?<=[。！？……])/u)
+    .map(sentence => sentence.trim())
+    .filter(Boolean);
+  if (sentences.length < 2) {
+    return explicit.length ? explicit : ['这封信没有留下文字。'];
+  }
+  const paragraphCount = Math.min(3, sentences.length);
+  const chunkSize = Math.ceil(sentences.length / paragraphCount);
+  return Array.from({ length: paragraphCount }, (_, index) =>
+    sentences.slice(index * chunkSize, (index + 1) * chunkSize).join(''),
+  ).filter(Boolean);
+}
+
 function Stat({
   count,
   label,
   accent,
+  selected,
   onPress,
 }: {
   count: number;
   label: string;
   accent?: boolean;
+  selected: boolean;
   onPress: () => void;
 }) {
   const { colors } = useTheme();
@@ -75,8 +136,15 @@ function Stat({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label}${count}封`}
+      accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => [styles.stat, { opacity: pressed ? 0.6 : 1 }]}
+      style={({ pressed }) => [
+        styles.stat,
+        {
+          backgroundColor: selected ? colors.surfaceAged : 'transparent',
+          opacity: pressed ? 0.6 : 1,
+        },
+      ]}
     >
       <Text
         style={[
@@ -120,42 +188,73 @@ function ArrivingLetter({
   onPress: () => void;
 }) {
   const { colors } = useTheme();
+  const reduceMotion = useReducedMotion();
+  const entry = useSharedValue(reduceMotion ? 1 : 0);
+  const linePulse = useSharedValue(reduceMotion ? 1 : 0.3);
   const elapsedYears = Math.max(
     0,
     now.getFullYear() - item.letter.sentAt.getFullYear(),
   );
+
+  useEffect(() => {
+    entry.value = withTiming(1, { duration: reduceMotion ? 1 : 500 });
+    if (!reduceMotion) {
+      linePulse.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 500 }),
+          withTiming(0.3, { duration: 500 }),
+        ),
+        3,
+        false,
+      );
+    }
+  }, [entry, linePulse, reduceMotion]);
+
+  const entryStyle = useAnimatedStyle(() => ({ opacity: entry.value }));
+  const lineStyle = useAnimatedStyle(() => ({ opacity: linePulse.value }));
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`拆开${letterTitle(item)}`}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.letterStrip,
-        styles.arrivingStrip,
-        {
-          backgroundColor: colors.surfaceAged,
-          borderLeftColor: colors.accent,
-          opacity: pressed ? 0.82 : 1,
-          transform: [{ scale: pressed ? 0.99 : 1 }],
-        },
-      ]}
-    >
-      <View style={styles.arrivingTop}>
-        <Text style={[styles.arrivingWhen, { color: colors.accent }]}>
-          ARRIVED
+    <Animated.View style={entryStyle}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`拆开${letterTitle(item)}`}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.letterStrip,
+          styles.arrivingStrip,
+          {
+            backgroundColor: colors.surfaceAged,
+            borderLeftColor: colors.line,
+            opacity: pressed ? 0.82 : 1,
+            transform: [{ scale: pressed ? 0.99 : 1 }],
+          },
+        ]}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.arrivingLine,
+            { backgroundColor: colors.accent },
+            lineStyle,
+          ]}
+        />
+        <View style={styles.arrivingTop}>
+          <Text style={[styles.arrivingWhen, { color: colors.accent }]}>
+            ARRIVED
+          </Text>
+          <Text style={[styles.arrivingProgress, { color: colors.textMuted }]}>
+            100%
+          </Text>
+        </View>
+        <Text style={[styles.arrivingTitle, { color: colors.text }]}>
+          {letterTitle(item)}
         </Text>
-        <Text style={[styles.arrivingProgress, { color: colors.textMuted }]}>
-          100%
+        <Text style={[styles.arrivingMeta, { color: colors.textMuted }]}>
+          写于 {formatDate(item.letter.sentAt)}
+          {elapsedYears ? ` · ${elapsedYears}年前` : ''}
         </Text>
-      </View>
-      <Text style={[styles.arrivingTitle, { color: colors.text }]}>
-        {letterTitle(item)}
-      </Text>
-      <Text style={[styles.arrivingMeta, { color: colors.textMuted }]}>
-        写于 {formatDate(item.letter.sentAt)}
-        {elapsedYears ? ` · ${elapsedYears}年前` : ''}
-      </Text>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -163,10 +262,12 @@ function TravelingLetter({
   item,
   now,
   onPress,
+  onLongPress,
 }: {
   item: LetterWithMemory;
   now: Date;
   onPress: () => void;
+  onLongPress: () => void;
 }) {
   const { colors } = useTheme();
   const days = Math.max(1, daysUntil(item.letter.arriveDate, now));
@@ -175,14 +276,16 @@ function TravelingLetter({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${letterTitle(item)}，还有${days}天到达`}
+      accessibilityHint="轻触查看旅程，长按删除"
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [
         styles.letterStrip,
         styles.travelingStrip,
         {
           backgroundColor: colors.surfaceWarm,
           borderLeftColor: colors.surfaceAged,
-          opacity: pressed ? 0.5 : 0.72,
+          opacity: pressed ? 0.72 : 1,
         },
       ]}
     >
@@ -242,7 +345,7 @@ function OpenedLetter({
         {
           backgroundColor: colors.surfaceWarm,
           borderLeftColor: colors.surfaceAged,
-          opacity: pressed ? 0.5 : 0.72,
+          opacity: pressed ? 0.72 : 1,
         },
       ]}
     >
@@ -266,31 +369,463 @@ function OpenedLetter({
   );
 }
 
-export function LettersScreen() {
-  const navigation = useNavigation<LettersNavigation>();
+function TravelingLetterSheet({
+  item,
+  now,
+  onClose,
+}: {
+  item?: LetterWithMemory;
+  now: Date;
+  onClose: () => void;
+}) {
+  const { colors } = useTheme();
+  if (!item) {
+    return null;
+  }
+  const days = Math.max(1, daysUntil(item.letter.arriveDate, now));
+  const progress = Math.round(getLetterProgress(item.letter, now) * 100);
+  const totalDays = Math.max(
+    1,
+    Math.round(
+      (item.letter.arriveDate.getTime() - item.letter.sentAt.getTime()) /
+        86_400_000,
+    ),
+  );
+  const elapsedDays = Math.max(0, totalDays - days);
+  const fromPlace = item.memory.placeDetail?.trim() || '出发地';
+
+  return (
+    <OverlayPortal
+      name="letters-traveling"
+      onRequestClose={onClose}
+      visible={Boolean(item)}
+    >
+      <View style={styles.sheetRoot}>
+        <Pressable
+          accessibilityLabel="收起在途信预览"
+          onPress={onClose}
+          style={styles.sheetBackdrop}
+        />
+        <ScrollView
+          accessibilityLabel="在途信详情"
+          accessibilityViewIsModal
+          contentContainerStyle={styles.travelSheetContent}
+          showsVerticalScrollIndicator={false}
+          style={[
+            styles.travelSheet,
+            { backgroundColor: colors.surface, borderColor: colors.line },
+          ]}
+        >
+          <View
+            style={[styles.sheetHandle, { backgroundColor: colors.line }]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="收起在途信预览"
+            onPress={onClose}
+            style={styles.sheetClose}
+          >
+            <Text style={styles.sheetCloseText}>×</Text>
+          </Pressable>
+          <View style={styles.travelEnvelopeWrap}>
+            <View style={styles.windLineOne} />
+            <View style={styles.windLineTwo} />
+            <View style={styles.windLineThree} />
+            <View style={styles.travelEnvelope}>
+              <View style={styles.travelEnvelopeFlap} />
+              <View style={styles.travelEnvelopeSeal} />
+            </View>
+          </View>
+          <Text style={styles.travelSheetTitle}>信在途中</Text>
+          <Text style={styles.travelSheetSubtitle}>
+            「{letterTitle(item)}」尚在山水间跋涉
+          </Text>
+          <View style={styles.routeTimeline}>
+            <View style={styles.routeNode}>
+              <View style={[styles.routeDot, styles.routeDotStart]} />
+              <Text numberOfLines={1} style={styles.routeCity}>
+                {fromPlace}
+              </Text>
+              <Text style={styles.routeLabel}>寄出日</Text>
+            </View>
+            <View style={styles.routeLine}>
+              <View
+                style={[
+                  styles.routeProgress,
+                  { width: `${Math.min(progress * 2, 100)}%` },
+                ]}
+              />
+            </View>
+            <View style={styles.routeNode}>
+              <View style={[styles.routeDot, styles.routeDotCurrent]} />
+              <Text style={styles.routeCity}>途中</Text>
+              <Text style={styles.routeLabel}>已行 {elapsedDays} 日</Text>
+            </View>
+            <View style={styles.routeLine}>
+              <View style={[styles.routeProgress, styles.routeProgressEmpty]} />
+            </View>
+            <View style={styles.routeNode}>
+              <View style={[styles.routeDot, styles.routeDotEnd]} />
+              <Text style={styles.routeCity}>彼岸</Text>
+              <Text style={styles.routeLabel}>约 {days} 日</Text>
+            </View>
+          </View>
+          <Text style={styles.travelMeta}>
+            全程约 {totalDays} 天 · 已行 {progress}%
+          </Text>
+          <Text style={styles.travelPoem}>山水迢迢，信在路上</Text>
+          <View style={styles.sheetActionDivider} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="知道了"
+            onPress={onClose}
+            style={styles.letterSheetButton}
+          >
+            <Text style={styles.letterSheetButtonText}>知道了</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    </OverlayPortal>
+  );
+}
+
+function ArrivingLetterSheet({
+  item,
+  onClose,
+  onUnseal,
+}: {
+  item?: LetterWithMemory;
+  onClose: () => void;
+  onUnseal: () => void;
+}) {
+  const { colors } = useTheme();
+  if (!item) {
+    return null;
+  }
+
+  return (
+    <OverlayPortal
+      name="letters-arriving"
+      onRequestClose={onClose}
+      visible={Boolean(item)}
+    >
+      <View style={styles.sheetRoot}>
+        <Pressable
+          accessibilityLabel="收起即将靠岸的信"
+          onPress={onClose}
+          style={styles.sheetBackdrop}
+        />
+        <View
+          accessibilityLabel="将至信详情"
+          accessibilityViewIsModal
+          style={[
+            styles.arrivingSheet,
+            { backgroundColor: colors.surface, borderColor: colors.line },
+          ]}
+        >
+          <View
+            style={[styles.sheetHandle, { backgroundColor: colors.line }]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="收起即将靠岸的信"
+            onPress={onClose}
+            style={styles.sheetClose}
+          >
+            <Text style={styles.sheetCloseText}>×</Text>
+          </Pressable>
+          <View style={styles.arrivingEnvelopeWrap}>
+            <View style={styles.arrivingEnvelope}>
+              <View style={styles.arrivingEnvelopeFlap} />
+              <View style={styles.arrivingSeal}>
+                <Text style={styles.arrivingSealText}>封</Text>
+              </View>
+            </View>
+          </View>
+          <Text style={styles.arrivingSheetTitle}>有信将至</Text>
+          <Text style={styles.arrivingSheetSubtitle}>一封信正漂向此岸</Text>
+          <Text style={styles.arrivingFrom}>自 那时的你 发来</Text>
+          <Text style={styles.arrivingPoem}>火漆尚温，宜静候</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`拆开${letterTitle(item)}`}
+            onPress={onUnseal}
+            style={styles.arrivingButton}
+          >
+            <Text style={styles.arrivingButtonText}>拆 信</Text>
+          </Pressable>
+          <Text style={styles.arrivingWait}>已抵达此岸 · 现在可拆</Text>
+        </View>
+      </View>
+    </OverlayPortal>
+  );
+}
+
+function OpenedLetterSheet({
+  item,
+  onClose,
+  onDelete,
+  onReply,
+}: {
+  item?: LetterWithMemory;
+  onClose: () => void;
+  onDelete: () => void;
+  onReply: () => void;
+}) {
   const { colors } = useTheme();
   const toast = useToast();
+  const [readProgress, setReadProgress] = useState(0);
+  const [ruleCount, setRuleCount] = useState(OPENED_LETTER_MIN_RULES);
+  if (!item) {
+    return null;
+  }
+  const date = item.letter.sentAt;
+  const hasPhoto = Boolean(item.memory.imagePath || item.memory.photoTone);
+  const hasAttachments = Boolean(
+    hasPhoto || item.memory.audioPath || item.memory.inkImagePath,
+  );
+  const isReply = item.letter.status === 'reply';
+  const paragraphs = splitLetterParagraphs(item.memory.content);
+  const hasWrittenSalutation = startsWithLetterSalutation(
+    item.memory.content,
+  );
+
+  return (
+    <OverlayPortal
+      name="letters-opened"
+      onRequestClose={onClose}
+      visible={Boolean(item)}
+    >
+      <View style={styles.sheetRoot}>
+        <Pressable
+          accessibilityLabel="合上信件"
+          onPress={onClose}
+          style={styles.sheetBackdrop}
+        />
+        <ScrollView
+          accessibilityLabel="已拆信详情"
+          accessibilityViewIsModal
+          contentContainerStyle={styles.openedSheetContent}
+          onScroll={event => {
+            const { contentOffset, contentSize, layoutMeasurement } =
+              event.nativeEvent;
+            const scrollable = Math.max(
+              1,
+              contentSize.height - layoutMeasurement.height,
+            );
+            setReadProgress(
+              Math.min(1, Math.max(0, contentOffset.y / scrollable)),
+            );
+          }}
+          scrollEventThrottle={80}
+          showsVerticalScrollIndicator={false}
+          style={[styles.openedSheet, { backgroundColor: colors.surface }]}
+        >
+          <View style={styles.readProgressTrack}>
+            <View
+              style={[
+                styles.readProgressValue,
+                { width: `${readProgress * 100}%` },
+              ]}
+            />
+          </View>
+          <View
+            style={[styles.sheetHandle, { backgroundColor: colors.line }]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="合上信件"
+            onPress={onClose}
+            style={styles.sheetClose}
+          >
+            <Text style={styles.sheetCloseText}>×</Text>
+          </Pressable>
+          <Text style={styles.openedCapsule}>
+            ◷ 写于 {formatDate(item.letter.sentAt)}
+          </Text>
+          <View pointerEvents="none" style={styles.openedTopRule} />
+          <View style={styles.openedHead}>
+            <View style={styles.openedFrom}>
+              <View style={styles.openedAvatar}>
+                <Text style={styles.openedAvatarText}>
+                  {isReply ? '回' : '旧'}
+                  {'\n'}
+                  {isReply ? '信' : '我'}
+                </Text>
+              </View>
+              <View>
+                <Text style={styles.openedFromName}>
+                  {isReply ? '后来写下的回信' : '那时的自己'}
+                </Text>
+                <Text style={styles.openedFromPlace}>
+                  {item.memory.placeDetail
+                    ? `写于${item.memory.placeDetail}`
+                    : '写于此地'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.openedPostmark}>
+              <Text style={styles.postmarkSmall}>DU</Text>
+              <Text style={styles.postmarkDay}>{date.getDate()}</Text>
+              <Text style={styles.postmarkSmall}>
+                {date
+                  .toLocaleDateString('en-US', {
+                    month: 'short',
+                    year: 'numeric',
+                  })
+                  .toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.openedFold} />
+          <View
+            onLayout={event => {
+              const nextCount = getOpenedLetterRuleCount(
+                event.nativeEvent.layout.height,
+              );
+              setRuleCount(current =>
+                current === nextCount ? current : nextCount,
+              );
+            }}
+            style={styles.openedBody}
+            testID="opened-letter-body"
+          >
+            <View
+              pointerEvents="none"
+              style={styles.openedRules}
+              testID="opened-letter-rules"
+            >
+              {Array.from({ length: ruleCount }, (_, index) => (
+                <View key={index} style={styles.openedRule} />
+              ))}
+            </View>
+            <View style={styles.openedRedLine} />
+            <View style={styles.inkBlobOne} />
+            <View style={styles.inkBlobTwo} />
+            <View style={styles.inkBlobThree} />
+            {!hasWrittenSalutation ? (
+              <Text style={styles.openedGreeting}>
+                {isReply ? '那时的我：' : '展信安：'}
+              </Text>
+            ) : null}
+            {paragraphs.map((paragraph, index) => (
+              <Text
+                key={`${index}-${paragraph}`}
+                style={[
+                  styles.openedParagraph,
+                  index > 0 && styles.openedParagraphGap,
+                ]}
+              >
+                {paragraph}
+              </Text>
+            ))}
+            <View style={styles.openedSignature}>
+              <Text style={styles.openedSignatureText}>那时的你</Text>
+              <View style={styles.openedSignatureSeal}>
+                <Text style={styles.openedSignatureSealText}>渡</Text>
+              </View>
+            </View>
+          </View>
+          {hasAttachments ? (
+            <View
+              accessibilityLabel="信件附件"
+              style={styles.openedAttachments}
+            >
+              {hasPhoto ? <Polaroid memory={item.memory} /> : null}
+              {item.memory.audioPath ? (
+                <AudioStrip memory={item.memory} onError={toast.show} />
+              ) : null}
+              {item.memory.inkImagePath ? (
+                <HandwritingAttachment path={item.memory.inkImagePath} />
+              ) : null}
+            </View>
+          ) : null}
+          <View style={styles.openedActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onClose}
+              style={styles.openedAction}
+            >
+              <Text style={styles.openedActionText}>← 合上</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onReply}
+              style={[styles.openedAction, styles.openedReplyAction]}
+            >
+              <Text style={styles.openedReplyText}>回 信</Text>
+            </Pressable>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="删除这封信"
+            onPress={onDelete}
+            style={styles.sheetDelete}
+          >
+            <Text style={styles.openedDeleteText}>删除这封信</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    </OverlayPortal>
+  );
+}
+
+export function LettersScreen() {
+  const navigation = useNavigation<LettersNavigation>();
+  const route = useRoute<LettersRoute>();
+  const { colors } = useTheme();
+  const toast = useToast();
+  const { trigger: triggerHaptic } = useHaptics();
+  const announcedArrivals = useRef(new Set<string>());
   const [sections, setSections] = useState(emptySections);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [filter, setFilter] = useState<LetterFilter>('all');
+  const [selectedTraveling, setSelectedTraveling] =
+    useState<LetterWithMemory>();
+  const [selectedArriving, setSelectedArriving] = useState<LetterWithMemory>();
+  const [selectedOpened, setSelectedOpened] = useState<LetterWithMemory>();
 
-  const load = useCallback(async (refresh = false) => {
-    if (refresh) {
-      setRefreshing(true);
-    }
-    const current = new Date();
-    setNow(current);
-    try {
-      setSections(await getLettersData(current));
-      setError(false);
-    } catch (loadError) {
-      console.error('读取信箱失败', loadError);
-      setError(true);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (refresh = false) => {
+      if (refresh) {
+        setRefreshing(true);
+      }
+      const current = new Date();
+      setNow(current);
+      try {
+        const next = await getLettersData(current);
+        const newArrival = next.arriving.find(
+          item => !announcedArrivals.current.has(item.letter.id),
+        );
+        next.arriving.forEach(item =>
+          announcedArrivals.current.add(item.letter.id),
+        );
+        if (newArrival) {
+          triggerHaptic('letterArrived');
+        }
+        setSections(next);
+        const requestedLetterId = route.params?.openArrivedLetterId;
+        if (requestedLetterId) {
+          const requested = next.arriving.find(
+            item => item.letter.id === requestedLetterId,
+          );
+          if (requested) {
+            setSelectedArriving(requested);
+          }
+          navigation.setParams({ openArrivedLetterId: undefined });
+        }
+        setError(false);
+      } catch (loadError) {
+        console.error('读取信箱失败', loadError);
+        setError(true);
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [navigation, route.params?.openArrivedLetterId, triggerHaptic],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -306,9 +841,27 @@ export function LettersScreen() {
     [sections],
   );
 
-  const manageTravelingLetter = (item: LetterWithMemory) => {
-    const days = Math.max(1, daysUntil(item.letter.arriveDate, now));
-    Alert.alert('信件在途中', `预计还有 ${days} 天靠岸。抵达前不能提前打开。`, [
+  const {
+    arriving: visibleArriving,
+    traveling: visibleTraveling,
+    opened: visibleOpened,
+  } = useMemo(
+    () => filterLetterSections(sections, filter, now),
+    [filter, now, sections],
+  );
+  const visibleCount =
+    visibleArriving.length + visibleTraveling.length + visibleOpened.length;
+
+  const toggleFilter = (next: LetterFilter) => {
+    setFilter(current => (current === next ? 'all' : next));
+  };
+
+  const openTravelingLetter = (item: LetterWithMemory) => {
+    setSelectedTraveling(item);
+  };
+
+  const confirmDeleteTravelingLetter = (item: LetterWithMemory) => {
+    Alert.alert('删除这封在途信？', '删除后，信纸和附件也会从本机移除。', [
       { text: '继续等待', style: 'cancel' },
       {
         text: '删除信件',
@@ -324,18 +877,47 @@ export function LettersScreen() {
               ]),
             )
             .then(() => {
+              setSelectedTraveling(undefined);
               toast.show('信件已删除');
               return load();
             })
-              .catch(deleteError => {
-                console.error('删除在途信件失败', deleteError);
+            .catch(deleteError => {
+              console.error('删除在途信件失败', deleteError);
               toast.show('信件没有删除，请再试一次');
             });
         },
       },
     ]);
   };
-
+  const confirmDeleteOpenedLetter = (item: LetterWithMemory) => {
+    Alert.alert('删除这封信？', '信件内容和附件会从本机永久移除。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除信件',
+        style: 'destructive',
+        onPress: () => {
+          deleteLetter(item)
+            .then(() =>
+              Promise.allSettled([
+                cancelLetterArrivalNotification(item.letter.id),
+                removeMediaFile(item.memory.imagePath),
+                removeMediaFile(item.memory.audioPath),
+                removeMediaFile(item.memory.inkImagePath),
+              ]),
+            )
+            .then(() => {
+              setSelectedOpened(undefined);
+              toast.show('信件已删除');
+              return load();
+            })
+            .catch(deleteError => {
+              console.error('删除已拆信件失败', deleteError);
+              toast.show('信件没有删除，请再试一次');
+            });
+        },
+      },
+    ]);
+  };
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
@@ -362,7 +944,8 @@ export function LettersScreen() {
               accent
               count={sections.tomorrowCount}
               label="明日到"
-              onPress={() => toast.show('明日到的信')}
+              onPress={() => toggleFilter('tomorrow')}
+              selected={filter === 'tomorrow'}
             />
             <View
               style={[styles.statDot, { backgroundColor: colors.surfaceAged }]}
@@ -370,7 +953,8 @@ export function LettersScreen() {
             <Stat
               count={sections.traveling.length}
               label="在途中"
-              onPress={() => toast.show('在途中的信')}
+              onPress={() => toggleFilter('traveling')}
+              selected={filter === 'traveling'}
             />
             <View
               style={[styles.statDot, { backgroundColor: colors.surfaceAged }]}
@@ -378,57 +962,74 @@ export function LettersScreen() {
             <Stat
               count={sections.opened.length}
               label="已拆"
-              onPress={() => toast.show('已拆的信')}
+              onPress={() => toggleFilter('opened')}
+              selected={filter === 'opened'}
             />
           </View>
+          {filter !== 'all' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="取消信箱筛选"
+              onPress={() => setFilter('all')}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: colors.surfaceAged,
+                  borderColor: colors.line,
+                },
+              ]}
+            >
+              <Text style={[styles.filterChipText, { color: colors.textSoft }]}>
+                {filter === 'tomorrow'
+                  ? '只看明日到'
+                  : filter === 'traveling'
+                  ? '只看在途中'
+                  : '只看已拆'}{' '}
+                ×
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
-        {sections.arriving.length ? (
+        {visibleArriving.length ? (
           <View style={styles.section}>
             <SectionTitle>即将靠岸</SectionTitle>
-            {sections.arriving.map(item => (
+            {visibleArriving.map(item => (
               <ArrivingLetter
                 item={item}
                 key={item.letter.id}
                 now={now}
-                onPress={() =>
-                  navigation.navigate('Unseal', {
-                    letterId: item.letter.id,
-                    source: 'letters',
-                  })
-                }
+                onPress={() => setSelectedArriving(item)}
               />
             ))}
           </View>
         ) : null}
 
-        {sections.traveling.length ? (
+        {visibleTraveling.length ? (
           <View style={styles.section}>
-            <SectionTitle>在途中</SectionTitle>
-            {sections.traveling.map(item => (
+            <SectionTitle>
+              {filter === 'tomorrow' ? '明日靠岸' : '在途中'}
+            </SectionTitle>
+            {visibleTraveling.map(item => (
               <TravelingLetter
                 item={item}
                 key={item.letter.id}
                 now={now}
-                onPress={() => manageTravelingLetter(item)}
+                onPress={() => openTravelingLetter(item)}
+                onLongPress={() => confirmDeleteTravelingLetter(item)}
               />
             ))}
           </View>
         ) : null}
 
-        {sections.opened.length ? (
+        {visibleOpened.length ? (
           <View style={styles.section}>
             <SectionTitle>已拆</SectionTitle>
-            {sections.opened.map(item => (
+            {visibleOpened.map(item => (
               <OpenedLetter
                 item={item}
                 key={item.letter.id}
-                onPress={() =>
-                  navigation.navigate('Unseal', {
-                    letterId: item.letter.id,
-                    source: 'letters',
-                  })
-                }
+                onPress={() => setSelectedOpened(item)}
               />
             ))}
           </View>
@@ -437,6 +1038,11 @@ export function LettersScreen() {
         {!totalCount && !error ? (
           <Text style={[styles.empty, { color: colors.textMuted }]}>
             还没有信漂在时间里
+          </Text>
+        ) : null}
+        {totalCount > 0 && !visibleCount && !error ? (
+          <Text style={[styles.empty, { color: colors.textMuted }]}>
+            这一栏还没有信
           </Text>
         ) : null}
         {error ? (
@@ -452,6 +1058,39 @@ export function LettersScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+      <TravelingLetterSheet
+        item={selectedTraveling}
+        now={now}
+        onClose={() => setSelectedTraveling(undefined)}
+      />
+      <ArrivingLetterSheet
+        item={selectedArriving}
+        onClose={() => setSelectedArriving(undefined)}
+        onUnseal={() => {
+          if (!selectedArriving) {
+            return;
+          }
+          const letterId = selectedArriving.letter.id;
+          setSelectedArriving(undefined);
+          navigation.navigate('Unseal', {
+            letterId,
+            source: 'letters',
+          });
+        }}
+      />
+      <OpenedLetterSheet
+        item={selectedOpened}
+        onClose={() => setSelectedOpened(undefined)}
+        onDelete={() => {
+          if (selectedOpened) {
+            confirmDeleteOpenedLetter(selectedOpened);
+          }
+        }}
+        onReply={() => {
+          setSelectedOpened(undefined);
+          navigation.navigate('Write');
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -483,10 +1122,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   stat: {
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing.xs,
     paddingHorizontal: spacing.card,
+    borderRadius: radius.pill,
+    justifyContent: 'center',
   },
   statNumber: {
     fontFamily: fontFamilies.englishSerif,
@@ -499,6 +1141,20 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   statDot: { width: 3, height: 3, borderRadius: radius.round },
+  filterChip: {
+    alignSelf: 'center',
+    minHeight: 30,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 0.5,
+    borderRadius: radius.pill,
+    justifyContent: 'center',
+  },
+  filterChipText: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
   section: {
     paddingHorizontal: spacing.page,
     paddingTop: spacing.card,
@@ -526,6 +1182,14 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   arrivingStrip: {},
+  arrivingLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: -2,
+    width: 2,
+    borderRadius: 1,
+  },
   arrivingTop: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -630,6 +1294,586 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.serif,
     fontSize: fontSizes.caption,
     letterSpacing: 1,
+  },
+  sheetRoot: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(48,38,30,0.44)',
+  },
+  travelSheet: {
+    maxHeight: '78%',
+    borderTopWidth: 0.5,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    boxShadow: '0 -8px 30px rgba(58,42,30,0.14)',
+  },
+  travelSheetContent: {
+    paddingTop: 12,
+    paddingHorizontal: 28,
+    paddingBottom: 40,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    marginBottom: 6,
+    borderRadius: radius.round,
+  },
+  sheetClose: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 30,
+    height: 30,
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(58,51,45,0.15)',
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
+  sheetCloseText: {
+    color: '#3A332D',
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+  },
+  travelEnvelopeWrap: {
+    alignSelf: 'center',
+    width: 100,
+    height: 80,
+    marginTop: 20,
+    marginBottom: 24,
+  },
+  travelEnvelope: {
+    width: 100,
+    height: 72,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(58,51,45,0.08)',
+    borderRadius: 4,
+    backgroundColor: '#F5EDE0',
+    boxShadow: '0 6px 20px rgba(58,42,30,0.15)',
+  },
+  travelEnvelopeFlap: {
+    position: 'absolute',
+    top: 0,
+    left: 15,
+    width: 70,
+    height: 70,
+    backgroundColor: 'rgba(184,122,98,0.2)',
+    transform: [{ translateY: -46 }, { rotate: '45deg' }],
+  },
+  travelEnvelopeSeal: {
+    position: 'absolute',
+    top: 26,
+    left: 40,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(184,92,56,0.35)',
+  },
+  windLineOne: {
+    position: 'absolute',
+    top: 15,
+    left: -40,
+    width: 30,
+    height: 1,
+    backgroundColor: 'rgba(139,115,85,0.3)',
+  },
+  windLineTwo: {
+    position: 'absolute',
+    top: 35,
+    left: -30,
+    width: 20,
+    height: 1,
+    backgroundColor: 'rgba(139,115,85,0.24)',
+  },
+  windLineThree: {
+    position: 'absolute',
+    top: 55,
+    left: -35,
+    width: 25,
+    height: 1,
+    backgroundColor: 'rgba(139,115,85,0.2)',
+  },
+  travelSheetTitle: {
+    textAlign: 'center',
+    color: '#3A332D',
+    fontFamily: fontFamilies.serif,
+    fontSize: 18,
+    letterSpacing: 2,
+  },
+  travelSheetSubtitle: {
+    marginTop: 6,
+    marginBottom: 18,
+    textAlign: 'center',
+    color: '#8B7355',
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 20.8,
+  },
+  routeTimeline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    paddingHorizontal: 10,
+  },
+  routeNode: {
+    width: 58,
+    alignItems: 'center',
+    gap: 6,
+  },
+  routeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  routeDotStart: { backgroundColor: '#8FAA95' },
+  routeDotCurrent: {
+    backgroundColor: '#B85C38',
+    boxShadow: '0 0 0 4px rgba(184,122,98,0.15)',
+  },
+  routeDotEnd: { backgroundColor: '#C9B99E' },
+  routeCity: {
+    width: 72,
+    textAlign: 'center',
+    color: '#3A332D',
+    fontFamily: fontFamilies.serif,
+    fontSize: 12,
+  },
+  routeLabel: {
+    color: '#8B7355',
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+  },
+  routeLine: {
+    flex: 1,
+    height: 2,
+    marginHorizontal: 6,
+    marginTop: -28,
+    backgroundColor: '#DED3C0',
+  },
+  routeProgress: {
+    height: '100%',
+    borderRadius: 1,
+    backgroundColor: '#B85C38',
+  },
+  routeProgressEmpty: { width: 0 },
+  travelMeta: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#B4A58F',
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 21.6,
+  },
+  travelPoem: {
+    marginTop: 16,
+    textAlign: 'center',
+    color: '#5C4F42',
+    fontFamily: fontFamilies.serif,
+    fontSize: 13,
+    fontStyle: 'italic',
+    letterSpacing: 1,
+  },
+  sheetActionDivider: {
+    height: 0.5,
+    marginTop: 28,
+    backgroundColor: 'rgba(58,51,45,0.08)',
+  },
+  sheetDelete: {
+    alignSelf: 'center',
+    minHeight: 44,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+  },
+  sheetDeleteText: { fontFamily: fontFamilies.serif, fontSize: 11 },
+  letterSheetButton: {
+    minHeight: 44,
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(58,51,45,0.12)',
+    borderRadius: 4,
+    backgroundColor: '#FBF8F0',
+  },
+  letterSheetButtonText: {
+    color: '#5C4F42',
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+    letterSpacing: 2,
+  },
+  arrivingSheet: {
+    paddingTop: 12,
+    paddingHorizontal: 28,
+    paddingBottom: 40,
+    borderTopWidth: 0.5,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    boxShadow: '0 -8px 30px rgba(58,42,30,0.14)',
+  },
+  arrivingEnvelopeWrap: {
+    alignSelf: 'center',
+    width: 120,
+    height: 100,
+    marginTop: 16,
+    marginBottom: 20,
+  },
+  arrivingEnvelope: {
+    width: 120,
+    height: 84,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(58,51,45,0.1)',
+    borderRadius: 4,
+    backgroundColor: '#F5EDE0',
+    boxShadow: '0 8px 28px rgba(58,42,30,0.18)',
+  },
+  arrivingEnvelopeFlap: {
+    position: 'absolute',
+    top: -56,
+    left: 18,
+    width: 84,
+    height: 84,
+    backgroundColor: 'rgba(184,122,98,0.25)',
+    transform: [{ rotate: '45deg' }],
+  },
+  arrivingSeal: {
+    position: 'absolute',
+    top: 26,
+    left: 42,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: '#B85C38',
+    boxShadow: '0 2px 10px rgba(184,122,98,0.4)',
+  },
+  arrivingSealText: {
+    color: '#FFF',
+    fontFamily: fontFamilies.serif,
+    fontSize: 12,
+  },
+  arrivingSheetTitle: {
+    textAlign: 'center',
+    color: '#3A332D',
+    fontFamily: fontFamilies.serif,
+    fontSize: 20,
+    letterSpacing: 3,
+  },
+  arrivingSheetSubtitle: {
+    marginTop: 6,
+    textAlign: 'center',
+    color: '#8B7355',
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+  },
+  arrivingFrom: {
+    marginTop: 8,
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#B85C38',
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+  },
+  arrivingPoem: {
+    marginBottom: 24,
+    textAlign: 'center',
+    color: '#B4A58F',
+    fontFamily: fontFamilies.serif,
+    fontSize: 12,
+    fontStyle: 'italic',
+    letterSpacing: 1,
+  },
+  arrivingButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
+    backgroundColor: '#B85C38',
+    boxShadow: '0 6px 20px rgba(184,122,98,0.35)',
+  },
+  arrivingButtonText: {
+    color: '#FFF',
+    fontFamily: fontFamilies.serif,
+    fontSize: 16,
+    letterSpacing: 4,
+  },
+  arrivingWait: {
+    marginTop: 12,
+    textAlign: 'center',
+    color: '#B4A58F',
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+  },
+  openedSheet: {
+    maxHeight: '92%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    boxShadow: '0 -8px 30px rgba(58,42,30,0.14)',
+  },
+  openedSheetContent: {
+    paddingTop: 12,
+    paddingHorizontal: 26,
+    paddingBottom: 36,
+  },
+  readProgressTrack: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    height: 2,
+    backgroundColor: 'rgba(58,51,45,0.05)',
+  },
+  readProgressValue: {
+    height: '100%',
+    backgroundColor: '#B85C38',
+  },
+  openedCapsule: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    marginBottom: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(184,92,56,0.25)',
+    borderRadius: 2,
+    color: 'rgba(184,92,56,0.6)',
+    fontFamily: fontFamilies.sans,
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  openedTopRule: {
+    position: 'absolute',
+    top: 12,
+    right: 20,
+    left: 20,
+    height: 1,
+    borderTopWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(184,92,56,0.10)',
+  },
+  openedHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(58,51,45,0.08)',
+  },
+  openedFrom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  openedAvatar: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(58,51,45,0.08)',
+    borderRadius: 20,
+    backgroundColor: '#F5EDE0',
+  },
+  openedAvatarText: {
+    textAlign: 'center',
+    color: '#B85C38',
+    fontFamily: fontFamilies.serif,
+    fontSize: 11,
+    lineHeight: 13.2,
+  },
+  openedFromName: {
+    color: '#3A332D',
+    fontFamily: fontFamilies.serif,
+    fontSize: 15,
+  },
+  openedFromPlace: {
+    marginTop: 2,
+    color: '#B4A58F',
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+  },
+  openedPostmark: {
+    width: 54,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(184,92,56,0.35)',
+    borderRadius: 27,
+    transform: [{ rotate: '-8deg' }],
+  },
+  postmarkSmall: {
+    color: 'rgba(184,92,56,0.65)',
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 8,
+    lineHeight: 10,
+  },
+  postmarkDay: {
+    color: 'rgba(184,92,56,0.8)',
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 15,
+  },
+  openedFold: {
+    height: 12,
+    marginTop: 8,
+    marginHorizontal: -26,
+    marginBottom: 14,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderTopColor: 'rgba(180,140,100,0.15)',
+    borderBottomColor: 'rgba(180,140,100,0.08)',
+  },
+  openedBody: {
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: 320,
+    paddingTop: 16,
+    paddingRight: 8,
+    paddingBottom: 48,
+    paddingLeft: 16,
+    backgroundColor: 'rgba(255,252,243,0.48)',
+  },
+  openedRules: {
+    position: 'absolute',
+    top: 9,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  openedRule: {
+    height: 1,
+    marginTop: 31,
+    backgroundColor: 'rgba(112,88,65,0.105)',
+  },
+  openedRedLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 9,
+    width: 1,
+    backgroundColor: 'rgba(200,80,60,0.17)',
+  },
+  inkBlobOne: {
+    position: 'absolute',
+    top: 40,
+    right: 40,
+    width: 14,
+    height: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(58,51,45,0.07)',
+  },
+  inkBlobTwo: {
+    position: 'absolute',
+    bottom: 120,
+    left: 22,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(184,92,56,0.10)',
+  },
+  inkBlobThree: {
+    position: 'absolute',
+    top: 130,
+    left: 50,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(58,51,45,0.12)',
+  },
+  openedGreeting: {
+    ...handwrittenLetterGreeting,
+  },
+  openedParagraph: {
+    ...handwrittenLetterText,
+  },
+  openedParagraphGap: {
+    marginTop: LETTER_TEXT_LINE_HEIGHT,
+  },
+  openedSignature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 12,
+    paddingTop: 32,
+    paddingRight: 8,
+  },
+  openedSignatureText: {
+    color: '#8B7355',
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  openedSignatureSeal: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 3,
+    backgroundColor: '#B85C38',
+    transform: [{ rotate: '-3deg' }],
+  },
+  openedSignatureSealText: {
+    color: '#FFF',
+    fontFamily: fontFamilies.serif,
+    fontSize: 10,
+  },
+  openedAttachments: {
+    marginTop: 24,
+    paddingTop: 4,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(58,51,45,0.08)',
+  },
+  openedActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 28,
+    paddingTop: 14,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(58,51,45,0.08)',
+  },
+  openedAction: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: 'rgba(58,51,45,0.12)',
+    borderRadius: 4,
+    backgroundColor: '#FBF8F0',
+  },
+  openedReplyAction: {
+    backgroundColor: '#B85C38',
+    borderColor: '#B85C38',
+  },
+  openedActionText: {
+    color: '#5C4F42',
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+    letterSpacing: 2,
+  },
+  openedReplyText: {
+    color: '#FFF',
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+    letterSpacing: 4,
+  },
+  openedDeleteText: {
+    color: '#B4A58F',
+    fontFamily: fontFamilies.serif,
+    fontSize: 11,
   },
   empty: {
     paddingHorizontal: spacing.page,

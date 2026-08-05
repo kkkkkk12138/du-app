@@ -1,8 +1,18 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {RouteProp, useNavigation, useRoute} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import DatePicker from 'react-native-date-picker';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  RouteProp,
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,38 +22,54 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import Svg, {Defs, LinearGradient, Path, Rect, Stop} from 'react-native-svg';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
-import {useToast} from '../../components/Toast';
-import {useHaptics} from '../../hooks/useHaptics';
-import {RootStackParamList} from '../../navigation/RootNavigator';
+import { useToast } from '../../components/Toast';
+import { useHaptics } from '../../hooks/useHaptics';
+import { RootStackParamList } from '../../navigation/RootNavigator';
 import {
   requestLetterNotificationAccess,
   scheduleLetterArrivalNotification,
 } from '../../services/letterNotifications';
-import {useSettingsStore} from '../../store/useSettingsStore';
-import {radius} from '../../tokens/radius';
-import {spacing} from '../../tokens/spacing';
-import {fontFamilies, fontSizes, lineHeights} from '../../tokens/typography';
-import {useTheme} from '../../theme/useTheme';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { radius } from '../../tokens/radius';
+import { fontFamilies } from '../../tokens/typography';
+import { useTheme } from '../../theme/useTheme';
 import {
+  combineArrivalDateAndTime,
   formatArrivalDate,
   getPresetArrivalDate,
   minimumArrivalDate,
-  startOfLocalDay,
 } from './futureLetterLogic';
-import type {ArrivalPreset} from './futureLetterLogic';
-import {createFutureLetter} from './futureLetterRepository';
+import type { ArrivalPreset } from './futureLetterLogic';
+import { createFutureLetter } from './futureLetterRepository';
+import { UnifiedArrivalDateTimePicker } from './UnifiedArrivalDateTimePicker';
+import { getProfileData } from '../profile/profileRepository';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList, 'NewLetter'>;
 type NewLetterRoute = RouteProp<RootStackParamList, 'NewLetter'>;
 
-const options: {id: ArrivalPreset; title: string; note: string}[] = [
-  {id: 'one_year', title: '一年后', note: '再走过一轮四季'},
-  {id: 'half_year', title: '半年后', note: '季节刚好换一面'},
-  {id: 'three_months', title: '三个月后', note: '留给不远的以后'},
-  {id: 'custom', title: '自定义', note: '选一个你记得的日子'},
+const options: {
+  id: ArrivalPreset;
+  icon: string;
+  title: string;
+  note: string;
+}[] = [
+  { id: 'one_month', icon: '月', title: '一个月后', note: '适合短期回望' },
+  { id: 'half_year', icon: '半', title: '半年后', note: '季节换了一轮' },
+  { id: 'next_birthday', icon: '寿', title: '下一个生日', note: '' },
+  { id: 'one_year', icon: '年', title: '一年后', note: '最受欢迎' },
+  { id: 'three_years', icon: '远', title: '三年后', note: '给更远的自己' },
+  {
+    id: 'custom',
+    icon: '自',
+    title: '自己选日子',
+    note: '选一个对你重要的日期',
+  },
 ];
 
 function RiverBackground() {
@@ -51,7 +77,8 @@ function RiverBackground() {
     <Svg
       preserveAspectRatio="none"
       style={StyleSheet.absoluteFill}
-      viewBox="0 0 100 100">
+      viewBox="0 0 100 100"
+    >
       <Defs>
         <LinearGradient id="river" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#D9E0DB" />
@@ -93,17 +120,17 @@ function SmallEnvelope() {
 export function NewLetterScreen() {
   const navigation = useNavigation<Navigation>();
   const route = useRoute<NewLetterRoute>();
-  const {colors, isDark} = useTheme();
+  const { colors } = useTheme();
   const toast = useToast();
   const haptics = useHaptics();
   const reduceMotion = useReducedMotion();
+  const insets = useSafeAreaInsets();
   const letterReminderOn = useSettingsStore(state => state.letterReminderOn);
-  const letterReminderTime = useSettingsStore(
-    state => state.letterReminderTime,
-  );
-  const [selection, setSelection] = useState<ArrivalPreset>('one_year');
+  const anonymousId = useSettingsStore(state => state.anonymousId);
+  const [selection, setSelection] = useState<ArrivalPreset>('one_month');
   const [customDate, setCustomDate] = useState(minimumArrivalDate);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [birthday, setBirthday] = useState<Date>();
+  const [dateTimePickerOpen, setDateTimePickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bloomOpacity = useSharedValue(0);
@@ -111,13 +138,44 @@ export function NewLetterScreen() {
   const riverOpacity = useSharedValue(0);
   const envelopeProgress = useSharedValue(0);
   const pageOpacity = useSharedValue(1);
+  const effectiveSelection =
+    selection === 'next_birthday' && !birthday ? 'one_month' : selection;
 
-  const selectedDate = useMemo(
-    () =>
-      selection === 'custom'
-        ? startOfLocalDay(customDate)
-        : getPresetArrivalDate(selection),
-    [customDate, selection],
+  const selectedDate = useMemo(() => {
+    const date =
+      effectiveSelection === 'custom'
+        ? customDate
+        : getPresetArrivalDate(effectiveSelection, new Date(), birthday);
+    return combineArrivalDateAndTime(date, customDate);
+  }, [birthday, customDate, effectiveSelection]);
+  const draft = route.params?.draft;
+  const hasDraftContent = Boolean(
+    draft?.content.trim() ||
+      draft?.imagePath ||
+      draft?.audioPath ||
+      draft?.inkImagePath ||
+      draft?.placeDetail,
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getProfileData(anonymousId ?? undefined)
+        .then(profile => {
+          if (active) {
+            setBirthday(profile.birthday);
+            setSelection(current =>
+              current === 'next_birthday' && !profile.birthday
+                ? 'one_month'
+                : current,
+            );
+          }
+        })
+        .catch(() => undefined);
+      return () => {
+        active = false;
+      };
+    }, [anonymousId]),
   );
 
   const clearTimers = () => {
@@ -139,18 +197,12 @@ export function NewLetterScreen() {
         pageOpacity,
       ].forEach(cancelAnimation);
     },
-    [
-      bloomOpacity,
-      bloomScale,
-      envelopeProgress,
-      pageOpacity,
-      riverOpacity,
-    ],
+    [bloomOpacity, bloomScale, envelopeProgress, pageOpacity, riverOpacity],
   );
 
   const bloomStyle = useAnimatedStyle(() => ({
     opacity: bloomOpacity.value,
-    transform: [{scale: bloomScale.value}],
+    transform: [{ scale: bloomScale.value }],
   }));
   const riverStyle = useAnimatedStyle(() => ({
     opacity: riverOpacity.value,
@@ -158,10 +210,10 @@ export function NewLetterScreen() {
   const envelopeStyle = useAnimatedStyle(() => ({
     opacity: riverOpacity.value * (1 - envelopeProgress.value),
     transform: [
-      {translateX: envelopeProgress.value * 210},
-      {translateY: envelopeProgress.value * 170},
-      {rotate: `${envelopeProgress.value * 3}deg`},
-      {scale: 1 - envelopeProgress.value * 0.7},
+      { translateX: envelopeProgress.value * 210 },
+      { translateY: envelopeProgress.value * 170 },
+      { rotate: `${envelopeProgress.value * 3}deg` },
+      { scale: 1 - envelopeProgress.value * 0.7 },
     ],
   }));
   const pageStyle = useAnimatedStyle(() => ({
@@ -171,24 +223,22 @@ export function NewLetterScreen() {
   const resetToLetters = () =>
     navigation.reset({
       index: 0,
-      routes: [{name: 'Main', params: {screen: 'Letters'}}],
+      routes: [{ name: 'Main', params: { screen: 'Letters' } }],
     });
   const departureMessage = (scheduled: boolean) =>
-    scheduled
-      ? '信已放入时间长河'
-      : '信已放入时间长河，通知未开启';
+    scheduled ? '信已放入时间长河' : '信已放入时间长河，通知未开启';
 
   const playDeparture = (notificationScheduled: boolean) => {
     haptics.trigger('seal');
     if (reduceMotion) {
-      pageOpacity.value = withTiming(0, {duration: 220});
+      pageOpacity.value = withTiming(0, { duration: 220 });
       schedule(() => {
         toast.show(departureMessage(notificationScheduled));
         resetToLetters();
       }, 260);
       return;
     }
-    bloomOpacity.value = withDelay(150, withTiming(1, {duration: 220}));
+    bloomOpacity.value = withDelay(150, withTiming(1, { duration: 220 }));
     bloomScale.value = withDelay(
       150,
       withTiming(30, {
@@ -196,8 +246,8 @@ export function NewLetterScreen() {
         easing: Easing.out(Easing.cubic),
       }),
     );
-    riverOpacity.value = withDelay(700, withTiming(1, {duration: 400}));
-    pageOpacity.value = withDelay(700, withTiming(0, {duration: 400}));
+    riverOpacity.value = withDelay(700, withTiming(1, { duration: 400 }));
+    pageOpacity.value = withDelay(700, withTiming(0, { duration: 400 }));
     envelopeProgress.value = withDelay(
       1100,
       withTiming(1, {
@@ -205,10 +255,7 @@ export function NewLetterScreen() {
         easing: Easing.inOut(Easing.cubic),
       }),
     );
-    schedule(
-      () => toast.show(departureMessage(notificationScheduled)),
-      2000,
-    );
+    schedule(() => toast.show(departureMessage(notificationScheduled)), 2000);
     schedule(resetToLetters, 2500);
   };
 
@@ -216,10 +263,15 @@ export function NewLetterScreen() {
     if (submitting) {
       return;
     }
+    if (preset === 'next_birthday' && !birthday) {
+      toast.show('先在个人资料中设置生日');
+      navigation.navigate('ProfileEdit');
+      return;
+    }
     setSelection(preset);
     haptics.trigger('selection');
     if (preset === 'custom') {
-      setPickerOpen(true);
+      setDateTimePickerOpen(true);
     }
   };
 
@@ -227,9 +279,8 @@ export function NewLetterScreen() {
     if (submitting) {
       return;
     }
-    const draft = route.params?.draft;
-    if (!draft?.content.trim()) {
-      toast.show('这封信还没有正文');
+    if (!draft || !hasDraftContent) {
+      toast.show('这封信还没有内容');
       return;
     }
     setSubmitting(true);
@@ -244,20 +295,18 @@ export function NewLetterScreen() {
     }
 
     try {
-      const {letter} = await createFutureLetter({
+      const { letter } = await createFutureLetter({
         draft,
         arriveDate: selectedDate,
-        arriveType: selection,
+        arriveType: effectiveSelection,
       });
       let notificationScheduled = false;
       if (notificationAllowed) {
         try {
-          notificationScheduled =
-            await scheduleLetterArrivalNotification({
-              letterId: letter.id,
-              arriveDate: selectedDate,
-              reminderTime: letterReminderTime,
-            });
+          notificationScheduled = await scheduleLetterArrivalNotification({
+            letterId: letter.id,
+            arriveDate: selectedDate,
+          });
         } catch (error) {
           console.warn('未来信通知调度失败', error);
         }
@@ -271,146 +320,183 @@ export function NewLetterScreen() {
   };
 
   return (
-    <View style={[styles.screen, {backgroundColor: colors.background}]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, riverStyle]}>
+        style={[StyleSheet.absoluteFill, riverStyle]}
+      >
         <RiverBackground />
       </Animated.View>
       <Animated.View
         pointerEvents="none"
-        style={[styles.departingEnvelope, envelopeStyle]}>
+        style={[styles.departingEnvelope, envelopeStyle]}
+      >
         <SmallEnvelope />
       </Animated.View>
 
       <Animated.View style={[styles.page, pageStyle]}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
+        <SafeAreaView
+          edges={['left', 'right', 'bottom']}
+          style={styles.safeArea}
+        >
+          <View
+            style={[
+              styles.topBar,
+              { height: 52 + insets.top, paddingTop: insets.top },
+            ]}
+          >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="返回此刻"
               disabled={submitting}
               hitSlop={12}
               onPress={() => navigation.goBack()}
-              style={styles.back}>
-              <Text style={[styles.backText, {color: colors.textSoft}]}>
-                ‹ 此刻
+              style={styles.back}
+            >
+              <Text style={[styles.backText, { color: colors.textFaint }]}>
+                ‹ 取消
               </Text>
             </Pressable>
-            <Text style={[styles.eyebrow, {color: colors.accent}]}>
-              LETTER TO THE FUTURE
-            </Text>
-            <Text style={[styles.title, {color: colors.text}]}>
-              让它在那一天靠岸
-            </Text>
-            <Text style={[styles.subtitle, {color: colors.textMuted}]}>
-              在到达之前，这封信不会被提前打开
-            </Text>
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}>
-            <View
-              style={[
-                styles.paper,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.line,
-                },
-              ]}>
-              <Text
-                numberOfLines={3}
-                style={[styles.preview, {color: colors.textSoft}]}>
-                {route.params?.draft.content}
+          <View style={styles.paper}>
+            <View style={styles.paperMarginLine} />
+            <View style={styles.titleArea}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                这封信
+                <Text style={{ color: colors.accent }}>何时</Text>
+                到达？
               </Text>
-              <View style={[styles.paperRule, {backgroundColor: colors.line}]} />
-              <Text style={[styles.arrivalLabel, {color: colors.textFaint}]}>
-                预计到达
-              </Text>
-              <Text style={[styles.arrivalDate, {color: colors.accent}]}>
-                {formatArrivalDate(selectedDate)}
+              <Text style={[styles.subtitle, { color: colors.textFaint }]}>
+                不到时间，你无法打开它。
               </Text>
             </View>
-
-            <Text style={[styles.sectionLabel, {color: colors.textMuted}]}>
-              选一段时间
-            </Text>
             <View style={styles.options}>
               {options.map(option => {
                 const selected = selection === option.id;
-                const optionDate =
+                const birthdayMissing =
+                  option.id === 'next_birthday' && !birthday;
+                const optionCalendarDate =
                   option.id === 'custom'
                     ? customDate
-                    : getPresetArrivalDate(option.id);
+                    : birthdayMissing
+                    ? undefined
+                    : getPresetArrivalDate(option.id, new Date(), birthday);
+                const optionDate = optionCalendarDate
+                  ? combineArrivalDateAndTime(optionCalendarDate, customDate)
+                  : undefined;
+                const optionIconStyle = {
+                  backgroundColor: selected
+                    ? 'rgba(192,57,43,0.06)'
+                    : 'rgba(58,51,45,0.03)',
+                };
+                const optionCheckStyle = {
+                  backgroundColor: selected ? colors.accent : 'transparent',
+                  borderColor: selected ? colors.accent : colors.line,
+                };
                 return (
                   <Pressable
                     accessibilityRole="radio"
                     accessibilityLabel={option.title}
-                    accessibilityState={{selected}}
+                    accessibilityState={{ disabled: birthdayMissing, selected }}
                     key={option.id}
                     onPress={() => chooseOption(option.id)}
-                    style={({pressed}) => [
+                    style={({ pressed }) => [
                       styles.option,
                       {
-                        backgroundColor: selected
-                          ? colors.surfaceAged
-                          : colors.surface,
-                        borderColor: selected ? colors.accent : colors.line,
-                        opacity: pressed ? 0.78 : 1,
-                        transform: [{scale: pressed ? 0.98 : 1}],
+                        borderBottomColor: colors.line,
+                        opacity: birthdayMissing ? 0.58 : pressed ? 0.72 : 1,
                       },
-                    ]}>
+                    ]}
+                  >
+                    {selected ? (
+                      <View
+                        style={[
+                          styles.selectedLine,
+                          { backgroundColor: colors.accent },
+                        ]}
+                      />
+                    ) : null}
+                    <View style={[styles.optionIcon, optionIconStyle]}>
+                      <Text
+                        style={[
+                          styles.optionIconText,
+                          {
+                            color: selected ? colors.accent : colors.textMuted,
+                          },
+                        ]}
+                      >
+                        {option.icon}
+                      </Text>
+                    </View>
                     <View style={styles.optionText}>
                       <Text
                         style={[
                           styles.optionTitle,
-                          {color: selected ? colors.accent : colors.text},
-                        ]}>
+                          { color: selected ? colors.accent : colors.text },
+                        ]}
+                      >
                         {option.title}
                       </Text>
                       <Text
-                        style={[
-                          styles.optionNote,
-                          {color: colors.textMuted},
-                        ]}>
-                        {option.note}
+                        style={[styles.optionNote, { color: colors.textFaint }]}
+                      >
+                        {birthdayMissing
+                          ? '先在个人资料中设置生日'
+                          : `${
+                              optionDate ? formatArrivalDate(optionDate) : ''
+                            }${option.note ? ` · ${option.note}` : ''}`}
                       </Text>
                     </View>
-                    <Text
-                      style={[
-                        styles.optionDate,
-                        {color: selected ? colors.accent : colors.textFaint},
-                      ]}>
-                      {formatArrivalDate(optionDate)}
-                    </Text>
+                    <View style={[styles.optionCheck, optionCheckStyle]}>
+                      {selected ? (
+                        <Text style={styles.optionCheckMark}>✓</Text>
+                      ) : null}
+                    </View>
                   </Pressable>
                 );
               })}
             </View>
-          </ScrollView>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="选择到达日期与时间"
+              onPress={() => setDateTimePickerOpen(true)}
+              style={styles.timeAction}
+            >
+              <Text
+                style={[styles.timeActionLabel, { color: colors.textFaint }]}
+              >
+                到达时刻
+              </Text>
+              <Text style={[styles.timeActionValue, { color: colors.accent }]}>
+                {String(selectedDate.getHours()).padStart(2, '0')}:
+                {String(selectedDate.getMinutes()).padStart(2, '0')}
+              </Text>
+              <Text
+                style={[styles.timeActionHint, { color: colors.textFaint }]}
+              >
+                一次选择日期与时间 ›
+              </Text>
+            </Pressable>
+          </View>
 
           <View style={styles.footer}>
-            <Text style={[styles.promise, {color: colors.textFaint}]}>
-              {letterReminderOn
-                ? `到达日当天 ${letterReminderTime} 提醒你`
-                : '未来信提醒已关闭'}
-            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="封信放入河中"
               disabled={submitting}
               onPress={sendLetter}
-              style={({pressed}) => [
+              style={({ pressed }) => [
                 styles.sendButton,
                 {
                   backgroundColor: colors.seal,
                   opacity: submitting ? 0.55 : pressed ? 0.82 : 1,
-                  transform: [{scale: pressed ? 0.96 : 1}],
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
                 },
-              ]}>
+              ]}
+            >
               <Text style={styles.sendButtonText}>
-                {submitting ? '正在封信……' : '封信 · 放入河中'}
+                {submitting ? '正在封信……' : '封 信 · 放 入 河 中'}
               </Text>
             </Pressable>
           </View>
@@ -419,27 +505,19 @@ export function NewLetterScreen() {
 
       <Animated.View
         pointerEvents="none"
-        style={[
-          styles.bloom,
-          {backgroundColor: colors.seal},
-          bloomStyle,
-        ]}
+        style={[styles.bloom, { backgroundColor: colors.seal }, bloomStyle]}
       />
-      <DatePicker
-        modal
-        cancelText="取消"
-        confirmText="选这一天"
-        date={customDate}
-        locale="zh-CN"
+      <UnifiedArrivalDateTimePicker
+        date={selectedDate}
         minimumDate={minimumArrivalDate()}
-        mode="date"
-        open={pickerOpen}
-        theme={isDark ? 'dark' : 'light'}
-        title="选择到达日期"
-        onCancel={() => setPickerOpen(false)}
+        name="new-letter-arrival-date-time"
+        visible={dateTimePickerOpen}
+        onCancel={() => {
+          setDateTimePickerOpen(false);
+        }}
         onConfirm={date => {
-          setPickerOpen(false);
-          setCustomDate(startOfLocalDay(date));
+          setDateTimePickerOpen(false);
+          setCustomDate(date);
           setSelection('custom');
         }}
       />
@@ -448,13 +526,14 @@ export function NewLetterScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, overflow: 'hidden'},
-  page: {flex: 1},
-  safeArea: {flex: 1},
-  header: {
-    paddingHorizontal: spacing.greeting,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+  screen: { flex: 1, overflow: 'hidden' },
+  page: { flex: 1 },
+  safeArea: { flex: 1 },
+  topBar: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   back: {
     minWidth: 72,
@@ -463,113 +542,156 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: {
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.bodyLarge,
-  },
-  eyebrow: {
-    marginTop: spacing.md,
-    fontFamily: fontFamilies.englishSerif,
-    fontSize: fontSizes.caption,
-    letterSpacing: 4,
-  },
-  title: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.h1,
-    lineHeight: lineHeights.h1,
-    letterSpacing: 1,
-  },
-  subtitle: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.secondary,
-    lineHeight: lineHeights.secondary,
-  },
-  content: {
-    paddingHorizontal: spacing.page,
-    paddingBottom: spacing.xl,
-  },
-  paper: {
-    padding: spacing.xl,
-    borderWidth: 0.5,
-    borderRadius: radius.image,
-    boxShadow: '0 10px 24px rgba(70, 48, 30, 0.08)',
-  },
-  preview: {
-    minHeight: 62,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.body,
-    lineHeight: lineHeights.body,
-  },
-  paperRule: {height: 0.5, marginVertical: spacing.lg},
-  arrivalLabel: {
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.caption,
-    letterSpacing: 2,
-  },
-  arrivalDate: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.title,
-    letterSpacing: 1,
-  },
-  sectionLabel: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.caption,
-    letterSpacing: 2,
-  },
-  options: {gap: spacing.sm},
-  option: {
-    minHeight: 72,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderWidth: 0.8,
-    borderRadius: radius.image,
-  },
-  optionText: {minWidth: 0, flex: 1},
-  optionTitle: {
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.bodyLarge,
-  },
-  optionNote: {
-    marginTop: spacing.xxs,
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.caption,
-  },
-  optionDate: {
-    fontFamily: fontFamilies.englishSerif,
-    fontSize: fontSizes.secondary,
-  },
-  footer: {
-    paddingHorizontal: spacing.page,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-  },
-  promise: {
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.caption,
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
     letterSpacing: 0.5,
   },
-  sendButton: {
-    minHeight: 54,
+  paper: {
+    flex: 1,
+    marginHorizontal: 12,
+    borderRadius: 2,
+    overflow: 'hidden',
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    backgroundColor: '#FEFCF5',
+    boxShadow:
+      '0 0 0 0.5px rgba(58,51,45,0.06), 0 1px 3px rgba(58,51,45,0.05), 0 6px 20px rgba(58,51,45,0.04)',
+  },
+  paperMarginLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 44,
+    width: 0.5,
+    backgroundColor: 'rgba(212,168,83,0.12)',
+  },
+  titleArea: {
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingLeft: 24,
+  },
+  title: {
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 22,
+    lineHeight: 30.8,
+  },
+  subtitle: {
+    marginTop: 4,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 19.2,
+    letterSpacing: 0.3,
+  },
+  options: {
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingLeft: 24,
+  },
+  option: {
+    minHeight: 61,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingRight: 16,
+    borderBottomWidth: 0.5,
+    position: 'relative',
+  },
+  selectedLine: {
+    position: 'absolute',
+    left: 0,
+    top: '50%',
+    width: 2,
+    height: 20,
+    marginTop: -10,
+    borderRadius: 1,
+  },
+  optionIcon: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.image,
-    boxShadow: '0 5px 14px rgba(100, 28, 15, 0.24)',
+    borderRadius: 16,
+  },
+  optionIconText: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+  },
+  optionText: { minWidth: 0, flex: 1 },
+  optionTitle: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  optionNote: {
+    marginTop: 3,
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+  optionCheck: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 9,
+  },
+  optionCheckMark: {
+    color: '#FFF',
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  timeAction: {
+    minHeight: 40,
+    marginLeft: 24,
+    marginRight: 16,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 2,
+    backgroundColor: 'rgba(192,57,43,0.04)',
+  },
+  timeActionLabel: {
+    fontFamily: fontFamilies.serif,
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  timeActionValue: {
+    marginLeft: 10,
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 15,
+    letterSpacing: 1,
+  },
+  timeActionHint: {
+    marginLeft: 'auto',
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+  },
+  footer: {
+    marginHorizontal: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    alignItems: 'center',
+  },
+  sendButton: {
+    minWidth: 200,
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 4,
+    boxShadow:
+      '0 2px 10px rgba(192,57,43,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
+    transform: [{ rotate: '-0.5deg' }],
   },
   sendButtonText: {
-    color: '#FFF5E8',
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.bodyLarge,
-    letterSpacing: 2,
+    color: '#FFF8F0',
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 16,
+    letterSpacing: 4,
   },
   bloom: {
     position: 'absolute',
@@ -602,7 +724,7 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     backgroundColor: '#D7C29C',
-    transform: [{rotate: '45deg'}],
+    transform: [{ rotate: '45deg' }],
   },
   envelopeFoldRight: {
     position: 'absolute',
@@ -611,7 +733,7 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     backgroundColor: '#CEB58C',
-    transform: [{rotate: '45deg'}],
+    transform: [{ rotate: '45deg' }],
   },
   envelopeSeal: {
     position: 'absolute',

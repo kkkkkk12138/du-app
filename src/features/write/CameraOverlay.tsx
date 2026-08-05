@@ -1,9 +1,12 @@
-import React, {useRef, useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {Camera, useCameraDevice} from 'react-native-vision-camera';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {archiveMediaFile} from '../../services/mediaStorage';
+import {
+  archiveDraftMediaFile,
+  removeMediaFile,
+} from '../../services/mediaStorage';
 import {fontFamilies} from '../../tokens/typography';
 
 type CameraOverlayProps = {
@@ -16,6 +19,17 @@ export function CameraOverlay({onCancel, onCapture}: CameraOverlayProps) {
   const device = useCameraDevice('back');
   const [capturing, setCapturing] = useState(false);
   const [captureError, setCaptureError] = useState<string>();
+  const [previewPath, setPreviewPath] = useState<string>();
+  const acceptedRef = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (previewPath && !acceptedRef.current) {
+        removeMediaFile(previewPath).catch(() => undefined);
+      }
+    },
+    [previewPath],
+  );
 
   const takePhoto = async () => {
     if (!camera.current || capturing) {
@@ -28,12 +42,34 @@ export function CameraOverlay({onCancel, onCapture}: CameraOverlayProps) {
         flash: 'off',
         enableShutterSound: true,
       });
-      onCapture(await archiveMediaFile(photo.path, 'photo', 'jpg'));
+      setPreviewPath(
+        await archiveDraftMediaFile(photo.path, 'photo', 'jpg'),
+      );
     } catch {
       setCaptureError('照片没有保存下来，请再试一次');
     } finally {
       setCapturing(false);
     }
+  };
+
+  const cancel = async () => {
+    await removeMediaFile(previewPath).catch(() => undefined);
+    setPreviewPath(undefined);
+    onCancel();
+  };
+
+  const retake = async () => {
+    await removeMediaFile(previewPath).catch(() => undefined);
+    setPreviewPath(undefined);
+    setCaptureError(undefined);
+  };
+
+  const usePhoto = () => {
+    if (!previewPath) {
+      return;
+    }
+    acceptedRef.current = true;
+    onCapture(previewPath);
   };
 
   return (
@@ -42,13 +78,20 @@ export function CameraOverlay({onCancel, onCapture}: CameraOverlayProps) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="取消拍照"
-          onPress={onCancel}>
+          onPress={cancel}>
           <Text style={styles.topAction}>取消</Text>
         </Pressable>
         <Text style={styles.title}>此刻的景</Text>
         <View style={styles.topPlaceholder} />
       </View>
-      {device ? (
+      {previewPath ? (
+        <Image
+          accessibilityLabel="拍摄照片预览"
+          resizeMode="contain"
+          source={{uri: `file://${previewPath}`}}
+          style={styles.camera}
+        />
+      ) : device ? (
         <Camera
           ref={camera}
           device={device}
@@ -67,17 +110,36 @@ export function CameraOverlay({onCancel, onCapture}: CameraOverlayProps) {
             {captureError}
           </Text>
         ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="拍下此刻"
-          disabled={!device || capturing}
-          onPress={takePhoto}
-          style={({pressed}) => [
-            styles.shutterOuter,
-            {opacity: !device || capturing ? 0.35 : pressed ? 0.7 : 1},
-          ]}>
-          <View style={styles.shutterInner} />
-        </Pressable>
+        {previewPath ? (
+          <View style={styles.previewActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重拍"
+              onPress={retake}
+              style={styles.secondaryAction}>
+              <Text style={styles.secondaryActionText}>重拍</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="使用照片"
+              onPress={usePhoto}
+              style={styles.primaryAction}>
+              <Text style={styles.primaryActionText}>使用照片</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="拍下此刻"
+            disabled={!device || capturing}
+            onPress={takePhoto}
+            style={({pressed}) => [
+              styles.shutterOuter,
+              {opacity: !device || capturing ? 0.35 : pressed ? 0.7 : 1},
+            ]}>
+            <View style={styles.shutterInner} />
+          </Pressable>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -115,6 +177,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+  },
+  previewActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  secondaryAction: {
+    minWidth: 96,
+    height: 44,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryActionText: {
+    color: 'rgba(255,255,255,0.78)',
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+  },
+  primaryAction: {
+    minWidth: 112,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFF8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryActionText: {
+    color: '#3A332D',
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
   },
   captureError: {
     color: 'rgba(255,255,255,0.72)',

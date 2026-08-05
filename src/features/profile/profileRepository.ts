@@ -1,15 +1,25 @@
 import { Q } from '@nozbe/watermelondb';
 
 import { database } from '../../db/database';
-import { Letter, Memory, Place, User } from '../../db/models';
+import { Letter, Memory, Place, Quest, User, Wish } from '../../db/models';
+import {
+  finalizePreparedMedia,
+  prepareMediaForPersistence,
+  removeMediaFile,
+  rollbackPreparedMedia,
+} from '../../services/mediaStorage';
 
 export type ProfileData = {
   nickname: string;
   avatarChar: string;
+  avatarPath?: string;
+  birthday?: Date;
   daysSinceJoining: number;
   memoryCount: number;
   placeCount: number;
   letterCount: number;
+  questCount: number;
+  wishCount: number;
 };
 
 async function getUser(anonymousId?: string) {
@@ -30,19 +40,54 @@ async function getUser(anonymousId?: string) {
 export async function getProfileData(
   anonymousId?: string,
 ): Promise<ProfileData> {
-  const [user, memoryCount, placeCount, letterCount] = await Promise.all([
-    getUser(anonymousId),
-    database
-      .get<Memory>('memories')
-      .query(Q.where('deleted', false), Q.where('is_future_letter', false))
-      .fetchCount(),
-    database.get<Place>('places').query().fetchCount(),
-    database.get<Letter>('letters').query().fetchCount(),
-  ]);
+  const [user, memories, places, letterCount, wishCount, questCount] =
+    await Promise.all([
+      getUser(anonymousId),
+      database
+        .get<Memory>('memories')
+        .query(
+          Q.where('deleted', false),
+          Q.where('is_future_letter', false),
+          Q.where('status', Q.notEq('draft')),
+        )
+        .fetch(),
+      database.get<Place>('places').query().fetch(),
+      database
+        .get<Letter>('letters')
+        .query(
+          Q.or(
+            Q.where('opened_at', Q.notEq(null)),
+            Q.where('status', Q.oneOf(['opened', 'reply'])),
+          ),
+        )
+        .fetchCount(),
+      database
+        .get<Wish>('wishes')
+        .query(
+          Q.where('deleted_at', Q.eq(null)),
+          Q.where('status', Q.notEq('archived')),
+        )
+        .fetchCount(),
+      database
+        .get<Quest>('quests')
+        .query(Q.where('deleted_at', Q.eq(null)), Q.where('is_template', false))
+        .fetchCount(),
+    ]);
+  const knownPlaceIds = new Set(places.map(place => place.id));
+  const placeCount = new Set(
+    memories
+      .map(memory => memory.placeId)
+      .filter(
+        (placeId): placeId is string =>
+          typeof placeId === 'string' && knownPlaceIds.has(placeId),
+      ),
+  ).size;
 
   return {
     nickname: user?.nickname ?? '渡河人',
     avatarChar: user?.avatarChar ?? '渡',
+    avatarPath: user?.avatarPath,
+    birthday: user?.birthday,
     daysSinceJoining: user?.createdAt
       ? Math.max(
           1,
@@ -51,9 +96,11 @@ export async function getProfileData(
           ) + 1,
         )
       : 1,
-    memoryCount,
+    memoryCount: memories.length,
     placeCount,
     letterCount,
+    questCount,
+    wishCount,
   };
 }
 
@@ -61,10 +108,14 @@ export async function updateProfile({
   anonymousId,
   nickname,
   avatarChar,
+  avatarPath,
+  birthday,
 }: {
   anonymousId?: string;
   nickname: string;
   avatarChar: string;
+  avatarPath?: string;
+  birthday?: Date;
 }) {
   const user = await getUser(anonymousId);
   if (!user) {
@@ -77,10 +128,26 @@ export async function updateProfile({
     throw new Error('昵称和头像不能为空');
   }
 
-  await database.write(() =>
-    user.update(record => {
-      record.nickname = nextNickname;
-      record.avatarChar = nextAvatarChar;
-    }),
-  );
+  const previousAvatarPath = user.avatarPath;
+  const prepared = await prepareMediaForPersistence(avatarPath, 'photo', 'jpg');
+
+  try {
+    await database.write(() =>
+      user.update(record => {
+        record.nickname = nextNickname;
+        record.avatarChar = nextAvatarChar;
+        record.avatarPath = prepared.path;
+        record.birthday = birthday;
+      }),
+    );
+    await finalizePreparedMedia([prepared]);
+    if (previousAvatarPath && previousAvatarPath !== prepared.path) {
+      await removeMediaFile(previousAvatarPath).catch(error => {
+        console.warn('旧头像清理失败', error);
+      });
+    }
+  } catch (error) {
+    await rollbackPreparedMedia([prepared]);
+    throw error;
+  }
 }

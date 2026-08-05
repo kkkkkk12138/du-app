@@ -4,8 +4,47 @@ import { database } from '../../db/database';
 import { Letter, Memory } from '../../db/models';
 import { classifyLetters } from './letterLogic';
 
-export { daysUntil, getLetterProgress } from './letterLogic';
-export type { LetterSections, LetterWithMemory } from './letterLogic';
+export {
+  daysUntil,
+  filterLetterSections,
+  getLetterProgress,
+} from './letterLogic';
+export type {
+  LetterFilter,
+  LetterSections,
+  LetterWithMemory,
+} from './letterLogic';
+
+export async function reconcileLetterArrivals(now = new Date()) {
+  const traveling = await database
+    .get<Letter>('letters')
+    .query(
+      Q.where('status', 'traveling'),
+      Q.where('arrive_date', Q.lte(now.getTime())),
+    )
+    .fetch();
+
+  const due = traveling.filter(
+    letter =>
+      letter.status === 'traveling' &&
+      letter.arriveDate.getTime() <= now.getTime(),
+  );
+
+  if (!due.length) {
+    return 0;
+  }
+
+  await database.write(() =>
+    database.batch(
+      ...due.map(letter =>
+        letter.prepareUpdate(record => {
+          record.status = 'arrived';
+        }),
+      ),
+    ),
+  );
+  return due.length;
+}
 
 async function getDisplayedMemory(letter: Letter) {
   const memoryId =
@@ -16,6 +55,7 @@ async function getDisplayedMemory(letter: Letter) {
 }
 
 export async function getLettersData(now = new Date()) {
+  await reconcileLetterArrivals(now);
   const letters = await database
     .get<Letter>('letters')
     .query(Q.sortBy('arrive_date', Q.asc))

@@ -56,9 +56,9 @@ export function AboutScreen() {
             }
           />
           <AboutRow
-            label="意见反馈"
+            label="数据与隐私"
             last
-            onPress={() => navigation.navigate('Feedback')}
+            onPress={() => navigation.navigate('DataPrivacy')}
           />
         </View>
 

@@ -17,11 +17,16 @@ import { FarawayScreen } from '../features/faraway/FarawayScreen';
 import { LettersScreen } from '../features/letters/LettersScreen';
 import { NewLetterScreen } from '../features/newLetter/NewLetterScreen';
 import { AboutScreen } from '../features/profile/AboutScreen';
+import { ArtSkinScreen } from '../features/profile/ArtSkinScreen';
 import { AnnualSummaryScreen } from '../features/profile/AnnualSummaryScreen';
+import { AuthorLetterScreen } from '../features/profile/AuthorLetterScreen';
+import { BookshelfScreen } from '../features/profile/BookshelfScreen';
+import { DataPrivacyScreen } from '../features/profile/DataPrivacyScreen';
 import { FeedbackScreen } from '../features/profile/FeedbackScreen';
 import { LegalDocumentScreen } from '../features/profile/LegalDocumentScreen';
 import { ProfileEditScreen } from '../features/profile/ProfileEditScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
+import { ScrapsScreen } from '../features/profile/ScrapsScreen';
 import { UnsealScreen } from '../features/unseal/UnsealScreen';
 import { WriteScreen } from '../features/write/WriteScreen';
 import { useTheme } from '../theme/useTheme';
@@ -29,13 +34,14 @@ import { linking } from './linking';
 
 export type MainTabParamList = {
   Daily: { newMemoryId?: string } | undefined;
-  Letters: undefined;
+  Letters: { openArrivedLetterId?: string } | undefined;
   Write: undefined;
   Faraway: undefined;
   Profile: undefined;
 };
 
 export type FutureLetterDraft = {
+  draftId?: string;
   content: string;
   type: string;
   customTags: string[];
@@ -51,8 +57,13 @@ export type RootStackParamList = {
   Unseal: { letterId?: string; source?: 'daily' | 'letters' } | undefined;
   NewLetter: { draft: FutureLetterDraft };
   About: undefined;
+  AuthorLetter: undefined;
   ProfileEdit: undefined;
   AnnualSummary: undefined;
+  Bookshelf: undefined;
+  Scraps: undefined;
+  ArtSkin: undefined;
+  DataPrivacy: undefined;
   Feedback: undefined;
   LegalDocument: { type: 'privacy' | 'terms' };
 };
@@ -119,8 +130,13 @@ export function RootNavigator() {
           options={{ presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="About" component={AboutScreen} />
+        <Stack.Screen name="AuthorLetter" component={AuthorLetterScreen} />
         <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
         <Stack.Screen name="AnnualSummary" component={AnnualSummaryScreen} />
+        <Stack.Screen name="Bookshelf" component={BookshelfScreen} />
+        <Stack.Screen name="Scraps" component={ScrapsScreen} />
+        <Stack.Screen name="ArtSkin" component={ArtSkinScreen} />
+        <Stack.Screen name="DataPrivacy" component={DataPrivacyScreen} />
         <Stack.Screen name="Feedback" component={FeedbackScreen} />
         <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
       </Stack.Navigator>

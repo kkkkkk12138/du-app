@@ -62,6 +62,7 @@ export async function createMemoryReply(memory: Memory, content: string) {
     const reply = await database.get<Memory>('memories').create(record => {
       record.type = 'reply';
       record.content = normalizedContent;
+      record.status = 'published';
       record.bodyTags = '[]';
       record.heartTags = '[]';
       record.customTags = '[]';

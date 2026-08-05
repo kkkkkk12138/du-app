@@ -10,7 +10,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import Svg, {Path} from 'react-native-svg';
 import {captureRef} from 'react-native-view-shot';
 
-import {archiveMediaFile} from '../../services/mediaStorage';
+import {archiveDraftMediaFile} from '../../services/mediaStorage';
 import {fontFamilies} from '../../tokens/typography';
 
 type Stroke = {
@@ -89,7 +89,9 @@ export function HandwritingOverlay({
         quality: 1,
         result: 'tmpfile',
       });
-      onComplete(await archiveMediaFile(temporaryPath, 'ink', 'png'));
+      onComplete(
+        await archiveDraftMediaFile(temporaryPath, 'ink', 'png'),
+      );
     } catch {
       onError('手书没有保存下来，请再试一次');
     } finally {

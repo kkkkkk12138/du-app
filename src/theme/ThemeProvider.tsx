@@ -2,17 +2,22 @@ import React, {createContext, PropsWithChildren, useMemo} from 'react';
 import {StatusBar, useColorScheme} from 'react-native';
 
 import {
-  darkColors,
-  lightColors,
+  getThemeColors,
   ThemeColors,
 } from '../tokens/colors';
-import {ThemeMode, useSettingsStore} from '../store/useSettingsStore';
+import {
+  ArtSkin,
+  ThemeMode,
+  useSettingsStore,
+} from '../store/useSettingsStore';
 
 export type DuTheme = {
   colors: ThemeColors;
   isDark: boolean;
   mode: ThemeMode;
+  artSkin: ArtSkin;
   setMode: (mode: ThemeMode) => void;
+  setArtSkin: (artSkin: ArtSkin) => void;
 };
 
 export const ThemeContext = createContext<DuTheme | null>(null);
@@ -21,16 +26,20 @@ export function ThemeProvider({children}: PropsWithChildren) {
   const systemScheme = useColorScheme();
   const mode = useSettingsStore(state => state.themeMode);
   const setMode = useSettingsStore(state => state.setThemeMode);
+  const artSkin = useSettingsStore(state => state.artSkin);
+  const setArtSkin = useSettingsStore(state => state.setArtSkin);
   const isDark = mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
 
   const value = useMemo<DuTheme>(
     () => ({
-      colors: isDark ? darkColors : lightColors,
+      colors: getThemeColors(isDark, artSkin),
       isDark,
       mode,
+      artSkin,
       setMode,
+      setArtSkin,
     }),
-    [isDark, mode, setMode],
+    [artSkin, isDark, mode, setArtSkin, setMode],
   );
 
   return (

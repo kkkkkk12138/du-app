@@ -6,6 +6,8 @@ import React, {
   useState,
 } from 'react';
 import {
+  ActionSheetIOS,
+  Alert,
   AppState,
   Image,
   KeyboardAvoidingView,
@@ -17,17 +19,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
   CompositeNavigationProp,
   useFocusEffect,
   useNavigation,
 } from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {
-  Gesture,
-  GestureDetector,
-} from 'react-native-gesture-handler';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   runOnJS,
@@ -40,7 +39,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Geolocation from 'react-native-geolocation-service';
 import Svg, {
   Circle,
@@ -52,26 +51,51 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-import {useToast} from '../../components/Toast';
-import {createMemory} from '../../db/memoryRepository';
+import { OverlayPortal } from '../../components/OverlayHost';
+import { useToast } from '../../components/Toast';
+import { createMemory } from '../../db/memoryRepository';
 import {
   AudioAttachment,
   useAudioRecorder,
 } from '../../hooks/useAudioRecorder';
-import {useHaptics} from '../../hooks/useHaptics';
+import { useHaptics } from '../../hooks/useHaptics';
 import {
   MainTabParamList,
   RootStackParamList,
 } from '../../navigation/RootNavigator';
-import {primitiveColors} from '../../tokens/colors';
-import {requestCameraAccess, requestLocationAccess} from '../../services/contextPermissions';
-import {removeMediaFile} from '../../services/mediaStorage';
-import {radius} from '../../tokens/radius';
-import {spacing} from '../../tokens/spacing';
-import {fontFamilies} from '../../tokens/typography';
-import {useTheme} from '../../theme/useTheme';
-import {CameraOverlay} from './CameraOverlay';
-import {HandwritingOverlay} from './HandwritingOverlay';
+import { primitiveColors } from '../../tokens/colors';
+import {
+  openAppSettings,
+  requestCameraAccess,
+  requestLocationAccess,
+} from '../../services/contextPermissions';
+import { removeMediaFile } from '../../services/mediaStorage';
+import { pickPhotoFromLibrary } from '../../services/photoLibrary';
+import {
+  requestLetterNotificationAccess,
+  scheduleLetterArrivalNotification,
+} from '../../services/letterNotifications';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { radius } from '../../tokens/radius';
+import { spacing } from '../../tokens/spacing';
+import { fontFamilies } from '../../tokens/typography';
+import { useTheme } from '../../theme/useTheme';
+import { CameraOverlay } from './CameraOverlay';
+import {
+  getLatestWriteDraft,
+  saveWriteDraft,
+  WriteDraftInput,
+} from './draftRepository';
+import { HandwritingOverlay } from './HandwritingOverlay';
+import {
+  combineArrivalDateAndTime,
+  formatArrivalDate,
+  getPresetArrivalDate,
+  minimumArrivalDate,
+} from '../newLetter/futureLetterLogic';
+import type { ArrivalPreset } from '../newLetter/futureLetterLogic';
+import { UnifiedArrivalDateTimePicker } from '../newLetter/UnifiedArrivalDateTimePicker';
+import { createFutureLetter } from '../newLetter/futureLetterRepository';
 
 type WriteNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Write'>,
@@ -79,14 +103,30 @@ type WriteNavigation = CompositeNavigationProp<
 >;
 
 type FeelingCategory = 'weather' | 'body' | 'heart';
+type DraftSaveState = 'idle' | 'saving' | 'saved' | 'failed';
 
 const FEELINGS_COLLAPSED_HEIGHT = 104;
 const FEELINGS_EXPANDED_HEIGHT = 236;
 const CUSTOM_FEELING_MAX_LENGTH = 12;
+const writeFutureOptions: {
+  id:
+    | Exclude<ArrivalPreset, 'one_month' | 'next_birthday' | 'custom'>
+    | 'custom';
+  title: string;
+  english: string;
+}[] = [
+  { id: 'three_months', title: '三个月后', english: '3 months' },
+  { id: 'half_year', title: '半年后', english: '6 months' },
+  { id: 'one_year', title: '一年后', english: '1 year' },
+  { id: 'three_years', title: '三年后', english: '3 years' },
+  { id: 'five_years', title: '五年后', english: '5 years' },
+  { id: 'ten_years', title: '十年后', english: '10 years' },
+  { id: 'custom', title: '自选', english: 'pick a date' },
+];
 
 const feelingCategories: Record<
   FeelingCategory,
-  {label: string; tags: string[]}
+  { label: string; tags: string[] }
 > = {
   weather: {
     label: '天',
@@ -169,7 +209,9 @@ function formatDates(now: Date) {
 
   return {
     stamp: `${months[now.getMonth()]} ${now.getDate()}`,
-    line: `${shortWeekdays[now.getDay()]} · ${months[now.getMonth()]} ${now.getDate()} · ${hour}:${minute}`,
+    line: `${shortWeekdays[now.getDay()]} · ${
+      months[now.getMonth()]
+    } ${now.getDate()} · ${hour}:${minute}`,
   };
 }
 
@@ -178,7 +220,29 @@ function formatDuration(seconds: number) {
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-function PaperBackground({isDark}: {isDark: boolean}) {
+function getWritePlaceholder(now: Date) {
+  const hour = now.getHours();
+  if (hour < 6) {
+    return '睡不着的话，写几句吧。';
+  }
+  if (hour < 11) {
+    return '昨夜的梦，今早的茶。';
+  }
+  if (hour < 18) {
+    return '此刻在想什么？';
+  }
+  return '今天过得怎么样？';
+}
+
+function reportDraftError(message: string, error: unknown) {
+  const nodeEnv = (globalThis as { process?: { env?: { NODE_ENV?: string } } })
+    .process?.env?.NODE_ENV;
+  if (nodeEnv !== 'test') {
+    console.error(message, error);
+  }
+}
+
+function PaperBackground({ isDark }: { isDark: boolean }) {
   return (
     <Svg height="100%" width="100%" style={StyleSheet.absoluteFill}>
       <Defs>
@@ -196,62 +260,114 @@ function PaperRules() {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <View style={styles.bindingLine} />
-      {Array.from({length: 22}, (_, index) => (
+      {Array.from({ length: 22 }, (_, index) => (
         <View
           key={index}
-          style={[styles.paperRule, {top: index * 31 + 31}]}
+          style={[styles.paperRule, { top: index * 31 + 31 }]}
         />
       ))}
     </View>
   );
 }
 
-function ToolIcon({name, color}: {name: string; color: string}) {
+function ToolIcon({ name, color }: { name: string; color: string }) {
   if (name === 'camera') {
     return (
       <Svg height={20} width={20} viewBox="0 0 24 24">
-        <Rect x={3} y={6} width={18} height={13} rx={2} fill="none" stroke={color} strokeWidth={1.3} />
-        <Circle cx={12} cy={12.5} r={3.5} fill="none" stroke={color} strokeWidth={1.3} />
-        <Path d="M8 6 9.5 4h5L16 6" fill="none" stroke={color} strokeWidth={1.3} />
+        <Rect
+          x={3}
+          y={6}
+          width={18}
+          height={13}
+          rx={2}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.3}
+        />
+        <Circle
+          cx={12}
+          cy={12.5}
+          r={3.5}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.3}
+        />
+        <Path
+          d="M8 6 9.5 4h5L16 6"
+          fill="none"
+          stroke={color}
+          strokeWidth={1.3}
+        />
       </Svg>
     );
   }
   if (name === 'audio') {
     return (
       <Svg height={20} width={20} viewBox="0 0 24 24">
-        <Rect x={9} y={3} width={6} height={11} rx={3} fill="none" stroke={color} strokeWidth={1.3} />
-        <Path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke={color} strokeWidth={1.3} />
+        <Rect
+          x={9}
+          y={3}
+          width={6}
+          height={11}
+          rx={3}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.3}
+        />
+        <Path
+          d="M5 11a7 7 0 0 0 14 0M12 18v3"
+          fill="none"
+          stroke={color}
+          strokeWidth={1.3}
+        />
       </Svg>
     );
   }
   if (name === 'ink') {
     return (
       <Svg height={20} width={20} viewBox="0 0 24 24">
-        <Path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" fill="none" stroke={color} strokeWidth={1.3} />
+        <Path
+          d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+          fill="none"
+          stroke={color}
+          strokeWidth={1.3}
+        />
       </Svg>
     );
   }
   return (
     <Svg height={20} width={20} viewBox="0 0 24 24">
-      <Path d="M12 22s-7-7.5-7-13a7 7 0 0 1 14 0c0 5.5-7 13-7 13z" fill="none" stroke={color} strokeWidth={1.3} />
-      <Circle cx={12} cy={9} r={2.5} fill="none" stroke={color} strokeWidth={1.3} />
+      <Path
+        d="M12 22s-7-7.5-7-13a7 7 0 0 1 14 0c0 5.5-7 13-7 13z"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.3}
+      />
+      <Circle
+        cx={12}
+        cy={9}
+        r={2.5}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.3}
+      />
     </Svg>
   );
 }
 
-function AttachmentEnter({children}: {children: React.ReactNode}) {
+function AttachmentEnter({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(reduceMotion ? 1 : 0);
 
   useEffect(() => {
     progress.value = reduceMotion
-      ? withTiming(1, {duration: 150})
-      : withSpring(1, {damping: 14, stiffness: 180});
+      ? withTiming(1, { duration: 150 })
+      : withSpring(1, { damping: 14, stiffness: 180 });
   }, [progress, reduceMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
-    transform: reduceMotion ? [] : [{scale: 0.8 + progress.value * 0.2}],
+    transform: reduceMotion ? [] : [{ scale: 0.8 + progress.value * 0.2 }],
   }));
 
   return <Animated.View style={animatedStyle}>{children}</Animated.View>;
@@ -274,13 +390,13 @@ function RecordingBar({
 
   useEffect(() => {
     entry.value = reduceMotion
-      ? withTiming(1, {duration: 150})
-      : withSpring(1, {damping: 18, stiffness: 190});
+      ? withTiming(1, { duration: 150 })
+      : withSpring(1, { damping: 18, stiffness: 190 });
     if (!reduceMotion) {
       pulse.value = withRepeat(
         withSequence(
-          withTiming(0.38, {duration: 500}),
-          withTiming(1, {duration: 500}),
+          withTiming(0.38, { duration: 500 }),
+          withTiming(1, { duration: 500 }),
         ),
         -1,
         false,
@@ -290,7 +406,7 @@ function RecordingBar({
 
   const barStyle = useAnimatedStyle(() => ({
     opacity: entry.value,
-    transform: reduceMotion ? [] : [{translateY: 44 * (1 - entry.value)}],
+    transform: reduceMotion ? [] : [{ translateY: 44 * (1 - entry.value) }],
   }));
   const dotStyle = useAnimatedStyle(() => ({
     opacity: pulse.value,
@@ -305,7 +421,7 @@ function RecordingBar({
             key={index}
             style={[
               styles.recordingWaveBar,
-              {transform: [{scaleY: level}]},
+              { transform: [{ scaleY: level }] },
             ]}
           />
         ))}
@@ -314,14 +430,16 @@ function RecordingBar({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="取消录音"
-        onPress={onCancel}>
+        onPress={onCancel}
+      >
         <Text style={styles.recordingCancel}>取消</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="完成录音"
         onPress={onComplete}
-        style={styles.recordingDone}>
+        style={styles.recordingDone}
+      >
         <Text style={styles.recordingDoneText}>完成</Text>
       </Pressable>
     </Animated.View>
@@ -330,14 +448,27 @@ function RecordingBar({
 
 export function WriteScreen() {
   const navigation = useNavigation<WriteNavigation>();
-  const {colors, isDark} = useTheme();
+  const { colors, isDark } = useTheme();
   const toast = useToast();
+  const showToast = toast.show;
   const haptics = useHaptics();
   const reduceMotion = useReducedMotion();
+  const letterReminderOn = useSettingsStore(state => state.letterReminderOn);
   const [now, setNow] = useState(() => new Date());
   const date = useMemo(() => formatDates(now), [now]);
   const [content, setContent] = useState('');
   const [isFuture, setIsFuture] = useState(false);
+  const [futureArriveAt, setFutureArriveAt] = useState<Date>();
+  const [futureArriveType, setFutureArriveType] =
+    useState<ArrivalPreset>('one_year');
+  const [futureSheetOpen, setFutureSheetOpen] = useState(false);
+  const [pendingFutureArriveAt, setPendingFutureArriveAt] = useState(() =>
+    getPresetArrivalDate('one_year'),
+  );
+  const [pendingFutureArriveType, setPendingFutureArriveType] =
+    useState<ArrivalPreset>('one_year');
+  const [futureDateTimePickerOpen, setFutureDateTimePickerOpen] =
+    useState(false);
   const [category, setCategory] = useState<FeelingCategory>('weather');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customFeelingTags, setCustomFeelingTags] = useState<string[]>([]);
@@ -349,9 +480,17 @@ export function WriteScreen() {
   const [audioAttachment, setAudioAttachment] = useState<AudioAttachment>();
   const [inkImagePath, setInkImagePath] = useState<string>();
   const [placeDetail, setPlaceDetail] = useState<string>();
+  const [manualPlaceDraft, setManualPlaceDraft] = useState('');
+  const [showManualPlace, setShowManualPlace] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [draftSaveState, setDraftSaveState] = useState<DraftSaveState>('idle');
   const [showCamera, setShowCamera] = useState(false);
   const [showHandwriting, setShowHandwriting] = useState(false);
+  const contentInputRef = useRef<TextInput>(null);
   const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftIdRef = useRef<string | undefined>(undefined);
+  const publishingRef = useRef(false);
+  const previousAssetSignature = useRef('');
   const stampScale = useSharedValue(1);
   const stampTranslateY = useSharedValue(0);
   const bloomScale = useSharedValue(1);
@@ -366,19 +505,169 @@ export function WriteScreen() {
   const whiteFieldStyle = {
     backgroundColor: isDark ? colors.background : '#FEFCF5',
   };
+  const draftInput = useMemo<WriteDraftInput>(
+    () => ({
+      content,
+      isFuture,
+      futureArriveAt,
+      futureArriveType: isFuture ? futureArriveType : undefined,
+      customTags: selectedTags,
+      imagePath: photoPath,
+      audioPath: audioAttachment?.path,
+      audioDuration: audioAttachment?.duration,
+      inkImagePath,
+      placeDetail,
+    }),
+    [
+      audioAttachment?.duration,
+      audioAttachment?.path,
+      content,
+      futureArriveAt,
+      futureArriveType,
+      inkImagePath,
+      isFuture,
+      photoPath,
+      placeDetail,
+      selectedTags,
+    ],
+  );
+  const persistDraft = useCallback(async () => {
+    if (!draftLoaded || publishingRef.current) {
+      return null;
+    }
+    setDraftSaveState('saving');
+    try {
+      const snapshot = await saveWriteDraft(draftInput, draftIdRef.current);
+      draftIdRef.current = snapshot?.id;
+      setDraftSaveState(snapshot ? 'saved' : 'idle');
+      return snapshot;
+    } catch (error) {
+      reportDraftError('草稿自动保存失败', error);
+      setDraftSaveState('failed');
+      return null;
+    }
+  }, [draftInput, draftLoaded]);
   const handleAudioComplete = useCallback(
     (attachment: AudioAttachment) => {
+      const previousPath = audioAttachment?.path;
       setAudioAttachment(attachment);
+      if (previousPath && previousPath !== attachment.path) {
+        removeMediaFile(previousPath).catch(error => {
+          console.warn('旧录音清理失败', error);
+        });
+      }
       haptics.trigger('record');
       toast.show('录音已落下');
     },
-    [haptics, toast],
+    [audioAttachment?.path, haptics, toast],
   );
   const handleToolError = useCallback(
     (message: string) => toast.show(message),
     [toast],
   );
-  const recorder = useAudioRecorder(handleAudioComplete, handleToolError);
+  const showSettingsAlert = useCallback(
+    (title: string, message: string) => {
+      Alert.alert(title, message, [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '前往设置',
+          onPress: () =>
+            openAppSettings().catch(() => toast.show('暂时无法打开系统设置')),
+        },
+      ]);
+    },
+    [toast],
+  );
+  const recorder = useAudioRecorder(handleAudioComplete, handleToolError, () =>
+    showSettingsAlert(
+      '需要麦克风权限',
+      '请在系统设置中允许“渡”使用麦克风，才能录下此刻的声音。',
+    ),
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    getLatestWriteDraft()
+      .then(draft => {
+        if (!mounted || !draft) {
+          return;
+        }
+        draftIdRef.current = draft.id;
+        setContent(draft.content);
+        setIsFuture(draft.isFuture);
+        setFutureArriveAt(draft.futureArriveAt);
+        setFutureArriveType(draft.futureArriveType ?? 'one_year');
+        setSelectedTags(draft.customTags);
+        setCustomFeelingTags(
+          draft.customTags.filter(tag => !presetFeelingTags.has(tag)),
+        );
+        setPhotoPath(draft.imagePath);
+        setAudioAttachment(
+          draft.audioPath && draft.audioDuration !== undefined
+            ? { path: draft.audioPath, duration: draft.audioDuration }
+            : undefined,
+        );
+        setInkImagePath(draft.inkImagePath);
+        setPlaceDetail(draft.placeDetail);
+        setDraftSaveState('saved');
+      })
+      .catch(error => {
+        reportDraftError('恢复写作草稿失败', error);
+        showToast('草稿暂时没有恢复，请重新进入此刻');
+      })
+      .finally(() => {
+        if (mounted) {
+          setDraftLoaded(true);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!draftLoaded || publishingRef.current) {
+      return;
+    }
+    setDraftSaveState(current => (current === 'failed' ? current : 'idle'));
+    const timer = setTimeout(() => {
+      persistDraft().catch(() => undefined);
+    }, 2_000);
+    return () => clearTimeout(timer);
+  }, [draftInput, draftLoaded, persistDraft]);
+
+  useEffect(() => {
+    if (!draftLoaded || publishingRef.current) {
+      return;
+    }
+    const signature = [
+      photoPath,
+      audioAttachment?.path,
+      audioAttachment?.duration,
+      inkImagePath,
+      placeDetail,
+    ].join('|');
+    if (signature === previousAssetSignature.current) {
+      return;
+    }
+    previousAssetSignature.current = signature;
+    persistDraft().catch(() => undefined);
+  }, [
+    audioAttachment?.duration,
+    audioAttachment?.path,
+    draftLoaded,
+    inkImagePath,
+    persistDraft,
+    photoPath,
+    placeDetail,
+  ]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      persistDraft().catch(() => undefined);
+    });
+    return unsubscribe;
+  }, [navigation, persistDraft]);
 
   useFocusEffect(
     useCallback(() => {
@@ -418,10 +707,12 @@ export function WriteScreen() {
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
         setNow(new Date());
+      } else {
+        persistDraft().catch(() => undefined);
       }
     });
     return () => subscription.remove();
-  }, []);
+  }, [persistDraft]);
 
   useEffect(
     () => () => {
@@ -434,14 +725,14 @@ export function WriteScreen() {
 
   const stampStyle = useAnimatedStyle(() => ({
     transform: [
-      {translateY: stampTranslateY.value},
-      {rotate: '-3deg'},
-      {scale: stampScale.value},
+      { translateY: stampTranslateY.value },
+      { rotate: '-3deg' },
+      { scale: stampScale.value },
     ],
   }));
   const bloomStyle = useAnimatedStyle(() => ({
     opacity: bloomOpacity.value,
-    transform: [{scale: bloomScale.value}],
+    transform: [{ scale: bloomScale.value }],
   }));
   const whiteStyle = useAnimatedStyle(() => ({
     opacity: whiteOpacity.value,
@@ -495,13 +786,42 @@ export function WriteScreen() {
       runOnJS(setFeelingsExpanded)(expanded);
     });
 
-  const toggleFuture = () => {
-    const next = !isFuture;
+  const openFutureSheet = () => {
+    const preset = isFuture ? futureArriveType : 'one_year';
+    const arriveAt =
+      isFuture && futureArriveAt
+        ? futureArriveAt
+        : getPresetArrivalDate('one_year', now);
+    setPendingFutureArriveType(preset);
+    setPendingFutureArriveAt(arriveAt);
+    setFutureSheetOpen(true);
     haptics.trigger('selection');
-    setIsFuture(next);
-    if (next) {
-      toast.show('寄给一年后的自己');
+  };
+
+  const chooseFuturePreset = (preset: ArrivalPreset) => {
+    setPendingFutureArriveType(preset);
+    if (preset === 'custom') {
+      setFutureDateTimePickerOpen(true);
+      return;
     }
+    setPendingFutureArriveAt(current =>
+      combineArrivalDateAndTime(getPresetArrivalDate(preset, now), current),
+    );
+  };
+
+  const confirmFuture = () => {
+    setFutureArriveType(pendingFutureArriveType);
+    setFutureArriveAt(pendingFutureArriveAt);
+    setIsFuture(true);
+    setFutureSheetOpen(false);
+    haptics.trigger('selection');
+  };
+
+  const clearFuture = () => {
+    setIsFuture(false);
+    setFutureArriveAt(undefined);
+    setFutureSheetOpen(false);
+    haptics.trigger('selection');
   };
 
   const toggleTag = (tag: string) => {
@@ -523,6 +843,10 @@ export function WriteScreen() {
     if (!tag) {
       return;
     }
+    if (tag.length > CUSTOM_FEELING_MAX_LENGTH) {
+      toast.show(`感觉最多 ${CUSTOM_FEELING_MAX_LENGTH} 个字`);
+      return;
+    }
 
     haptics.trigger('selection');
     if (!presetFeelingTags.has(tag)) {
@@ -538,32 +862,114 @@ export function WriteScreen() {
   };
 
   const openCamera = async () => {
-    if (await requestCameraAccess()) {
+    const permission = await requestCameraAccess();
+    if (permission === 'granted') {
       setShowCamera(true);
+    } else if (permission === 'blocked') {
+      showSettingsAlert(
+        '需要相机权限',
+        '请在系统设置中允许“渡”使用相机，才能拍下此刻的景。',
+      );
     } else {
       toast.show('没有相机权限，暂时不能拍照');
     }
   };
 
   const addPhoto = async (path: string) => {
-    await removeMediaFile(photoPath);
+    const previousPath = photoPath;
     setPhotoPath(path);
     setShowCamera(false);
+    if (previousPath && previousPath !== path) {
+      await removeMediaFile(previousPath).catch(error => {
+        console.warn('旧照片清理失败', error);
+      });
+    }
     haptics.trigger('selection');
     toast.show('已添加此刻的景');
   };
 
+  const openPhotoLibrary = async () => {
+    const result = await pickPhotoFromLibrary();
+    if (result.status === 'selected') {
+      await addPhoto(result.path);
+    } else if (result.status === 'error') {
+      toast.show(result.message);
+    }
+  };
+
+  const choosePhotoSource = () => {
+    haptics.trigger('selection');
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: photoPath ? '替换这张照片' : '添加此刻的景',
+          options: ['拍照', '从相册选择', '取消'],
+          cancelButtonIndex: 2,
+        },
+        index => {
+          if (index === 0) {
+            openCamera().catch(() => toast.show('相机暂时没有打开'));
+          } else if (index === 1) {
+            openPhotoLibrary().catch(() => toast.show('相册暂时没有打开'));
+          }
+        },
+      );
+      return;
+    }
+    Alert.alert(photoPath ? '替换这张照片' : '添加此刻的景', undefined, [
+      {
+        text: '拍照',
+        onPress: () => openCamera().catch(() => toast.show('相机暂时没有打开')),
+      },
+      {
+        text: '从相册选择',
+        onPress: () =>
+          openPhotoLibrary().catch(() => toast.show('相册暂时没有打开')),
+      },
+      { text: '取消', style: 'cancel' },
+    ]);
+  };
+
   const addInk = async (path: string) => {
-    await removeMediaFile(inkImagePath);
+    const previousPath = inkImagePath;
     setInkImagePath(path);
     setShowHandwriting(false);
+    if (previousPath && previousPath !== path) {
+      await removeMediaFile(previousPath).catch(error => {
+        console.warn('旧手书清理失败', error);
+      });
+    }
     haptics.trigger('selection');
     toast.show('手书已落下');
   };
 
   const addLocation = async () => {
-    if (!(await requestLocationAccess())) {
-      toast.show('没有位置权限，暂时不能标记');
+    const permission = await requestLocationAccess();
+    if (permission === 'blocked') {
+      Alert.alert(
+        '需要位置权限',
+        '你可以手动写下地点，或前往系统设置允许“渡”读取位置。',
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '手动填写',
+            onPress: () => {
+              setManualPlaceDraft(placeDetail ?? '');
+              setShowManualPlace(true);
+            },
+          },
+          {
+            text: '系统设置',
+            onPress: () =>
+              openAppSettings().catch(() => toast.show('暂时无法打开系统设置')),
+          },
+        ],
+      );
+      return;
+    }
+    if (permission !== 'granted') {
+      setManualPlaceDraft(placeDetail ?? '');
+      setShowManualPlace(true);
       return;
     }
     Geolocation.getCurrentPosition(
@@ -574,7 +980,11 @@ export function WriteScreen() {
         haptics.trigger('selection');
         toast.show('已标记当前位置');
       },
-      () => toast.show('暂时没有读到位置，请稍后再试'),
+      () => {
+        toast.show('暂时没有读到位置，可以手动写下地点');
+        setManualPlaceDraft(placeDetail ?? '');
+        setShowManualPlace(true);
+      },
       {
         enableHighAccuracy: true,
         timeout: 10_000,
@@ -583,9 +993,25 @@ export function WriteScreen() {
     );
   };
 
+  const saveManualPlace = () => {
+    const normalized = manualPlaceDraft.trim();
+    if (!normalized) {
+      toast.show('请写下一个地点');
+      return;
+    }
+    if (normalized.length > 60) {
+      toast.show('地点最多 60 个字');
+      return;
+    }
+    setPlaceDetail(normalized);
+    setShowManualPlace(false);
+    haptics.trigger('selection');
+    toast.show('已写下地点');
+  };
+
   const handleToolPress = (tool: string) => {
     if (tool === 'camera') {
-      openCamera();
+      choosePhotoSource();
     } else if (tool === 'audio') {
       if (recorder.recording) {
         recorder.stop(false);
@@ -611,10 +1037,11 @@ export function WriteScreen() {
       <Pressable
         accessibilityRole="checkbox"
         accessibilityLabel={tag}
-        accessibilityState={{checked: selected}}
+        accessibilityState={{ checked: selected }}
         key={tag}
         onPress={() => toggleTag(tag)}
-        style={[styles.feelingTag, selectedFeelingStyle]}>
+        style={[styles.feelingTag, selectedFeelingStyle]}
+      >
         <Text
           style={[
             styles.feelingTagText,
@@ -625,7 +1052,8 @@ export function WriteScreen() {
                   : '#FEFCF5'
                 : colors.textMuted,
             },
-          ]}>
+          ]}
+        >
           {tag}
         </Text>
       </Pressable>
@@ -636,34 +1064,34 @@ export function WriteScreen() {
     haptics.trigger('seal');
     const quick = reduceMotion ? 1 : 100;
     stampScale.value = withSequence(
-      withTiming(0.9, {duration: quick}),
-      withTiming(1, {duration: quick}),
+      withTiming(0.9, { duration: quick }),
+      withTiming(1, { duration: quick }),
     );
     stampTranslateY.value = withSequence(
-      withDelay(quick, withTiming(1, {duration: quick})),
-      withTiming(0, {duration: quick}),
+      withDelay(quick, withTiming(1, { duration: quick })),
+      withTiming(0, { duration: quick }),
     );
 
     if (includeBloom && !reduceMotion) {
       bloomOpacity.value = withDelay(
         150,
         withSequence(
-          withTiming(0.4, {duration: 275}),
-          withTiming(0, {duration: 275}),
+          withTiming(0.4, { duration: 275 }),
+          withTiming(0, { duration: 275 }),
         ),
       );
       bloomScale.value = withDelay(
         150,
-        withTiming(20, {duration: 550, easing: Easing.out(Easing.cubic)}),
+        withTiming(20, { duration: 550, easing: Easing.out(Easing.cubic) }),
       );
       whiteOpacity.value = withDelay(
         600,
         withSequence(
-          withTiming(1, {duration: 100}),
-          withTiming(0, {duration: 300}),
+          withTiming(1, { duration: 100 }),
+          withTiming(0, { duration: 300 }),
         ),
       );
-      pageOpacity.value = withDelay(1000, withTiming(0, {duration: 200}));
+      pageOpacity.value = withDelay(1000, withTiming(0, { duration: 200 }));
     }
 
     navigationTimer.current = setTimeout(
@@ -672,43 +1100,100 @@ export function WriteScreen() {
     );
   };
 
+  const closeWrite = async () => {
+    await persistDraft();
+    navigation.navigate('Daily');
+  };
+
   const submit = async () => {
     if (saving) {
       return;
     }
 
     const trimmed = content.trim();
-    if (!trimmed) {
-      toast.show('先落下几句话');
+    if (
+      !trimmed &&
+      !photoPath &&
+      !audioAttachment &&
+      !inkImagePath &&
+      !placeDetail
+    ) {
+      toast.show('先落下一句话或一份附件');
       return;
     }
     if (isFuture) {
-      animateStamp(
-        () =>
-          navigation.navigate('NewLetter', {
-            draft: {
-              content: trimmed,
-              type: photoPath
-                ? 'photo'
-                : audioAttachment
-                  ? 'audio'
-                  : 'text',
-              customTags: selectedTags,
-              imagePath: photoPath,
-              audioPath: audioAttachment?.path,
-              audioDuration: audioAttachment?.duration,
-              inkImagePath,
-              placeDetail,
-            },
-          }),
-        false,
-      );
+      setSaving(true);
+      publishingRef.current = true;
+      const arriveDate =
+        futureArriveAt ??
+        (futureArriveType === 'custom'
+          ? minimumArrivalDate(now)
+          : getPresetArrivalDate(futureArriveType, now));
+      let notificationAllowed = false;
+      if (letterReminderOn) {
+        try {
+          notificationAllowed = await requestLetterNotificationAccess();
+        } catch (error) {
+          console.warn('通知权限请求失败', error);
+        }
+      }
+      try {
+        const { letter } = await createFutureLetter({
+          draft: {
+            draftId: draftIdRef.current,
+            content: trimmed,
+            type: photoPath ? 'photo' : audioAttachment ? 'audio' : 'text',
+            customTags: selectedTags,
+            imagePath: photoPath,
+            audioPath: audioAttachment?.path,
+            audioDuration: audioAttachment?.duration,
+            inkImagePath,
+            placeDetail,
+          },
+          arriveDate,
+          arriveType: futureArriveType,
+        });
+        if (notificationAllowed) {
+          scheduleLetterArrivalNotification({
+            letterId: letter.id,
+            arriveDate,
+          }).catch(error => console.warn('未来信通知调度失败', error));
+        }
+        draftIdRef.current = undefined;
+        animateStamp(() => {
+          toast.show('信已放入时间长河');
+          navigation.navigate('Letters');
+          setContent('');
+          contentInputRef.current?.clear();
+          setIsFuture(false);
+          setFutureArriveAt(undefined);
+          setFutureArriveType('one_year');
+          setSelectedTags([]);
+          setCustomFeelingTags([]);
+          setCustomFeelingDraft('');
+          setShowCustomFeelingInput(false);
+          setPhotoPath(undefined);
+          setAudioAttachment(undefined);
+          setInkImagePath(undefined);
+          setPlaceDetail(undefined);
+          setDraftSaveState('idle');
+          setSaving(false);
+          publishingRef.current = false;
+        }, true);
+      } catch (error) {
+        console.error('保存未来信失败', error);
+        setSaving(false);
+        publishingRef.current = false;
+        toast.show('信没有放稳，请再试一次');
+      }
       return;
     }
 
     setSaving(true);
+    publishingRef.current = true;
     try {
       const memory = await createMemory({
+        draftId: draftIdRef.current,
         content: trimmed,
         type: photoPath ? 'photo' : audioAttachment ? 'audio' : 'text',
         customTags: selectedTags,
@@ -719,10 +1204,12 @@ export function WriteScreen() {
         placeDetail,
         writtenAt: new Date(),
       });
+      draftIdRef.current = undefined;
       animateStamp(() => {
         toast.show('落下了');
-        navigation.navigate('Daily', {newMemoryId: memory.id});
+        navigation.navigate('Daily', { newMemoryId: memory.id });
         setContent('');
+        contentInputRef.current?.clear();
         setSelectedTags([]);
         setCustomFeelingTags([]);
         setCustomFeelingDraft('');
@@ -731,11 +1218,14 @@ export function WriteScreen() {
         setAudioAttachment(undefined);
         setInkImagePath(undefined);
         setPlaceDetail(undefined);
+        setDraftSaveState('idle');
         setSaving(false);
+        publishingRef.current = false;
       }, true);
     } catch (error) {
       console.error('保存此刻失败', error);
       setSaving(false);
+      publishingRef.current = false;
       toast.show('没有落稳，请再试一次');
     }
   };
@@ -762,49 +1252,54 @@ export function WriteScreen() {
   return (
     <SafeAreaView
       edges={['top', 'left', 'right']}
-      style={[
-        styles.safeArea,
-        screenBackgroundStyle,
-      ]}>
+      style={[styles.safeArea, screenBackgroundStyle]}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.safeArea}>
+        style={styles.safeArea}
+      >
         <Animated.View style={[styles.page, pageStyle]}>
           <View style={styles.topBar}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="收起"
               hitSlop={8}
-              onPress={() => navigation.navigate('Daily')}
-              style={({pressed}) => ({opacity: pressed ? 0.6 : 1})}>
-              <Text style={[styles.close, {color: colors.textMuted}]}>收起</Text>
+              onPress={() => closeWrite().catch(() => undefined)}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
+              <Text style={[styles.close, { color: colors.textMuted }]}>
+                收起
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="switch"
               accessibilityLabel="未来信模式"
-              accessibilityState={{checked: isFuture}}
+              accessibilityState={{ checked: isFuture }}
               hitSlop={8}
-              onPress={toggleFuture}
-              style={({pressed}) => ({opacity: pressed ? 0.6 : 1})}>
+              onPress={openFutureSheet}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            >
               <Text
                 style={[
                   styles.dateStamp,
-                  {color: isFuture ? colors.accent : colors.textMuted},
-                ]}>
+                  { color: isFuture ? colors.accent : colors.textMuted },
+                ]}
+              >
                 {date.stamp.toUpperCase()}
               </Text>
             </Pressable>
           </View>
 
-          <View style={[styles.paper, {borderColor: colors.line}]}>
+          <View style={[styles.paper, { borderColor: colors.line }]}>
             <PaperBackground isDark={isDark} />
             <PaperRules />
             <Pressable
               accessibilityRole="switch"
-              accessibilityLabel="寄给明年"
-              accessibilityState={{checked: isFuture}}
-              onPress={toggleFuture}
-              style={styles.futureFold}>
+              accessibilityLabel="寄给未来"
+              accessibilityState={{ checked: isFuture }}
+              onPress={openFutureSheet}
+              style={styles.futureFold}
+            >
               <Svg height={44} width={44}>
                 <Polygon
                   points="44,0 44,44 0,0"
@@ -815,14 +1310,19 @@ export function WriteScreen() {
               <Text
                 style={[
                   styles.futureText,
-                  {color: isFuture ? colors.accent : colors.textFaint},
-                ]}>
-                明年
+                  { color: isFuture ? colors.accent : colors.textFaint },
+                ]}
+              >
+                {isFuture && futureArriveAt
+                  ? `${
+                      futureArriveAt.getMonth() + 1
+                    }.${futureArriveAt.getDate()}`
+                  : '未来'}
               </Text>
             </Pressable>
 
             <View style={styles.paperHead}>
-              <Text style={[styles.paperDate, {color: colors.textFaint}]}>
+              <Text style={[styles.paperDate, { color: colors.textFaint }]}>
                 {date.line.toUpperCase()}
               </Text>
             </View>
@@ -831,24 +1331,60 @@ export function WriteScreen() {
               contentContainerStyle={styles.bodyContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              style={styles.body}>
+              style={styles.body}
+            >
               <TextInput
                 accessibilityLabel="此刻内容"
+                defaultValue={content}
+                key={`write-content-${draftLoaded ? 'restored' : 'loading'}`}
                 multiline
                 onChangeText={setContent}
-                placeholder={'此刻……\n\n不用想好，落下来就好。'}
-                placeholderTextColor={
-                  isDark ? 'rgba(232,223,211,0.25)' : 'rgba(58,51,45,0.2)'
-                }
+                placeholder={getWritePlaceholder(now)}
+                placeholderTextColor={colors.textMuted}
+                ref={contentInputRef}
                 selectionColor={colors.accent}
-                style={[styles.input, {color: colors.text}]}
+                style={[styles.input, { color: colors.text }]}
                 textAlignVertical="top"
-                value={content}
               />
-              {content.length > 400 ? (
-                <Text style={[styles.count, {color: colors.textFaint}]}>
-                  {content.length} 字 · 建议在 500 字内
-                </Text>
+              <Text
+                style={[
+                  styles.count,
+                  {
+                    color:
+                      content.length > 500 ? colors.accent : colors.textFaint,
+                  },
+                ]}
+              >
+                {content.length} 字
+              </Text>
+              {draftSaveState !== 'idle' ? (
+                <Pressable
+                  accessibilityRole={
+                    draftSaveState === 'failed' ? 'button' : undefined
+                  }
+                  disabled={draftSaveState !== 'failed'}
+                  onPress={() => persistDraft().catch(() => undefined)}
+                >
+                  <Text
+                    style={[
+                      styles.draftStatus,
+                      {
+                        color:
+                          draftSaveState === 'failed'
+                            ? colors.accent
+                            : colors.textFaint,
+                      },
+                    ]}
+                  >
+                    {
+                      {
+                        saving: '正在保存草稿…',
+                        saved: '草稿已保存',
+                        failed: '未保存，点此重试',
+                      }[draftSaveState]
+                    }
+                  </Text>
+                </Pressable>
               ) : null}
             </ScrollView>
 
@@ -858,17 +1394,21 @@ export function WriteScreen() {
                   <AttachmentEnter>
                     <View style={styles.photoAttachment}>
                       <Image
-                        source={{uri: `file://${photoPath}`}}
+                        source={{ uri: `file://${photoPath}` }}
                         style={styles.photoPreview}
                       />
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="删除照片"
-                        onPress={async () => {
-                          await removeMediaFile(photoPath);
+                        onPress={() => {
+                          const removedPath = photoPath;
                           setPhotoPath(undefined);
+                          removeMediaFile(removedPath).catch(() =>
+                            toast.show('照片已移除，文件稍后清理'),
+                          );
                         }}
-                        style={styles.removeAttachment}>
+                        style={styles.removeAttachment}
+                      >
                         <Text style={styles.removeAttachmentText}>×</Text>
                       </Pressable>
                     </View>
@@ -880,8 +1420,9 @@ export function WriteScreen() {
                       <Text
                         style={[
                           styles.audioAttachmentIcon,
-                          {color: colors.accent},
-                        ]}>
+                          { color: colors.accent },
+                        ]}
+                      >
                         声
                       </Text>
                       <View style={styles.audioAttachmentWave}>
@@ -891,7 +1432,7 @@ export function WriteScreen() {
                               key={index}
                               style={[
                                 styles.audioAttachmentBar,
-                                {height, backgroundColor: colors.textFaint},
+                                { height, backgroundColor: colors.textFaint },
                               ]}
                             />
                           ),
@@ -900,22 +1441,28 @@ export function WriteScreen() {
                       <Text
                         style={[
                           styles.attachmentMeta,
-                          {color: colors.textMuted},
-                        ]}>
+                          { color: colors.textMuted },
+                        ]}
+                      >
                         {formatDuration(audioAttachment.duration)}
                       </Text>
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="删除录音"
-                        onPress={async () => {
-                          await removeMediaFile(audioAttachment.path);
+                        onPress={() => {
+                          const removedPath = audioAttachment.path;
                           setAudioAttachment(undefined);
-                        }}>
+                          removeMediaFile(removedPath).catch(() =>
+                            toast.show('录音已移除，文件稍后清理'),
+                          );
+                        }}
+                      >
                         <Text
                           style={[
                             styles.inlineRemove,
-                            {color: colors.textFaint},
-                          ]}>
+                            { color: colors.textFaint },
+                          ]}
+                        >
                           ×
                         </Text>
                       </Pressable>
@@ -927,17 +1474,21 @@ export function WriteScreen() {
                     <View style={styles.inkAttachment}>
                       <Image
                         resizeMode="contain"
-                        source={{uri: `file://${inkImagePath}`}}
+                        source={{ uri: `file://${inkImagePath}` }}
                         style={styles.inkPreview}
                       />
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="删除手书"
-                        onPress={async () => {
-                          await removeMediaFile(inkImagePath);
+                        onPress={() => {
+                          const removedPath = inkImagePath;
                           setInkImagePath(undefined);
+                          removeMediaFile(removedPath).catch(() =>
+                            toast.show('手书已移除，文件稍后清理'),
+                          );
                         }}
-                        style={styles.removeAttachment}>
+                        style={styles.removeAttachment}
+                      >
                         <Text style={styles.removeAttachmentText}>×</Text>
                       </Pressable>
                     </View>
@@ -949,12 +1500,14 @@ export function WriteScreen() {
                       accessibilityRole="button"
                       accessibilityLabel="移除位置"
                       onPress={() => setPlaceDetail(undefined)}
-                      style={styles.locationAttachment}>
+                      style={styles.locationAttachment}
+                    >
                       <Text
                         style={[
                           styles.attachmentMeta,
-                          {color: colors.textMuted},
-                        ]}>
+                          { color: colors.textMuted },
+                        ]}
+                      >
                         此刻坐标 · {placeDetail} ×
                       </Text>
                     </Pressable>
@@ -976,12 +1529,11 @@ export function WriteScreen() {
               <Animated.View
                 style={[
                   styles.feelingsPanel,
-                  isDark
-                    ? styles.feelingsPanelDark
-                    : styles.feelingsPanelLight,
-                  {borderTopColor: colors.line},
+                  isDark ? styles.feelingsPanelDark : styles.feelingsPanelLight,
+                  { borderTopColor: colors.line },
                   feelingsPanelStyle,
-                ]}>
+                ]}
+              >
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={
@@ -989,11 +1541,12 @@ export function WriteScreen() {
                   }
                   accessibilityHint="也可以上下拖动"
                   onPress={() => setFeelingsPanel(!feelingsExpanded)}
-                  style={styles.feelingsHandle}>
+                  style={styles.feelingsHandle}
+                >
                   <View
                     style={[
                       styles.feelingsHandleBar,
-                      {backgroundColor: colors.textFaint},
+                      { backgroundColor: colors.textFaint },
                     ]}
                   />
                 </Pressable>
@@ -1012,7 +1565,8 @@ export function WriteScreen() {
                             category === item && {
                               borderBottomColor: colors.text,
                             },
-                          ]}>
+                          ]}
+                        >
                           <Text
                             style={[
                               styles.categoryText,
@@ -1022,7 +1576,8 @@ export function WriteScreen() {
                                     ? colors.text
                                     : colors.textFaint,
                               },
-                            ]}>
+                            ]}
+                          >
                             {feelingCategories[item].label}
                           </Text>
                         </Pressable>
@@ -1037,12 +1592,14 @@ export function WriteScreen() {
                         accessibilityRole="button"
                         accessibilityLabel="自己写感觉"
                         onPress={openCustomFeelingInput}
-                        style={styles.customFeelingTrigger}>
+                        style={styles.customFeelingTrigger}
+                      >
                         <Text
                           style={[
                             styles.customFeelingTriggerText,
-                            {color: colors.textFaint},
-                          ]}>
+                            { color: colors.textFaint },
+                          ]}
+                        >
                           ＋ 自己写…
                         </Text>
                       </Pressable>
@@ -1051,19 +1608,22 @@ export function WriteScreen() {
                     <ScrollView
                       horizontal
                       contentContainerStyle={styles.tagRow}
-                      showsHorizontalScrollIndicator={false}>
+                      showsHorizontalScrollIndicator={false}
+                    >
                       {feelingCategories[category].tags.map(renderFeelingTag)}
                       {customFeelingTags.map(renderFeelingTag)}
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="自己写感觉"
                         onPress={openCustomFeelingInput}
-                        style={styles.customFeelingTrigger}>
+                        style={styles.customFeelingTrigger}
+                      >
                         <Text
                           style={[
                             styles.customFeelingTriggerText,
-                            {color: colors.textFaint},
-                          ]}>
+                            { color: colors.textFaint },
+                          ]}
+                        >
                           ＋ 自己写…
                         </Text>
                       </Pressable>
@@ -1077,12 +1637,11 @@ export function WriteScreen() {
                       accessibilityLabel="自定义感觉"
                       autoFocus
                       blurOnSubmit={false}
-                      maxLength={CUSTOM_FEELING_MAX_LENGTH}
+                      defaultValue=""
                       onChangeText={setCustomFeelingDraft}
-                      onSubmitEditing={addCustomFeeling}
                       placeholder="比如：今天有点软"
                       placeholderTextColor={colors.textFaint}
-                      returnKeyType="done"
+                      returnKeyType="default"
                       selectionColor={colors.accent}
                       style={[
                         styles.customFeelingInput,
@@ -1091,25 +1650,29 @@ export function WriteScreen() {
                           color: colors.text,
                         },
                       ]}
-                      value={customFeelingDraft}
                     />
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel="加入自定义感觉"
                       disabled={!customFeelingDraft.trim()}
                       onPress={addCustomFeeling}
-                      style={({pressed}) => [
+                      style={({ pressed }) => [
                         styles.customFeelingAdd,
                         {
-                          opacity:
-                            !customFeelingDraft.trim() ? 0.35 : pressed ? 0.6 : 1,
+                          opacity: !customFeelingDraft.trim()
+                            ? 0.35
+                            : pressed
+                            ? 0.6
+                            : 1,
                         },
-                      ]}>
+                      ]}
+                    >
                       <Text
                         style={[
                           styles.customFeelingAddText,
-                          {color: colors.accent},
-                        ]}>
+                          { color: colors.accent },
+                        ]}
+                      >
                         加入
                       </Text>
                     </Pressable>
@@ -1123,8 +1686,9 @@ export function WriteScreen() {
                         <Text
                           style={[
                             styles.selectedTagText,
-                            {color: primitiveColors.rose},
-                          ]}>
+                            { color: primitiveColors.rose },
+                          ]}
+                        >
                           {tag}
                         </Text>
                       </View>
@@ -1142,7 +1706,7 @@ export function WriteScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={
                     {
-                      camera: '拍照',
+                      camera: '添加图片',
                       audio: '录音',
                       ink: '手书',
                       location: '位置',
@@ -1150,10 +1714,11 @@ export function WriteScreen() {
                   }
                   key={tool}
                   onPress={() => handleToolPress(tool)}
-                  style={({pressed}) => [
+                  style={({ pressed }) => [
                     styles.tool,
-                    pressed && {backgroundColor: colors.line},
-                  ]}>
+                    pressed && { backgroundColor: colors.line },
+                  ]}
+                >
                   <ToolIcon
                     color={
                       (tool === 'audio' && recorder.recording) ||
@@ -1173,21 +1738,23 @@ export function WriteScreen() {
               accessibilityLabel={isFuture ? '继续写未来信' : '落下此刻'}
               disabled={saving}
               onPress={submit}
-              style={styles.sealButton}>
+              style={styles.sealButton}
+            >
               <Animated.View
                 pointerEvents="none"
                 style={[
                   styles.sealBloom,
-                  {backgroundColor: colors.seal},
+                  { backgroundColor: colors.seal },
                   bloomStyle,
                 ]}
               />
               <Animated.View
                 style={[
                   styles.sealStamp,
-                  {backgroundColor: colors.seal},
+                  { backgroundColor: colors.seal },
                   stampStyle,
-                ]}>
+                ]}
+              >
                 <Text style={styles.sealText}>落</Text>
               </Animated.View>
             </Pressable>
@@ -1195,20 +1762,203 @@ export function WriteScreen() {
         </Animated.View>
         <Animated.View
           pointerEvents="none"
-          style={[
-            styles.whiteField,
-            whiteFieldStyle,
-            whiteStyle,
-          ]}
+          style={[styles.whiteField, whiteFieldStyle, whiteStyle]}
         />
       </KeyboardAvoidingView>
+      <OverlayPortal
+        name="write-manual-place"
+        onRequestClose={() => setShowManualPlace(false)}
+        visible={showManualPlace}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.manualPlaceBackdrop}
+        >
+          <Pressable
+            accessibilityLabel="关闭手动地点"
+            onPress={() => setShowManualPlace(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            accessibilityViewIsModal
+            style={[
+              styles.manualPlaceSheet,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.line,
+              },
+            ]}
+          >
+            <Text style={[styles.manualPlaceTitle, { color: colors.text }]}>
+              写下此刻地点
+            </Text>
+            <Text style={[styles.manualPlaceHint, { color: colors.textMuted }]}>
+              不需要定位权限，只保存在这条日迹里。
+            </Text>
+            <TextInput
+              accessibilityLabel="手动地点"
+              autoFocus
+              defaultValue={manualPlaceDraft}
+              onChangeText={setManualPlaceDraft}
+              placeholder="例如：家里的窗边"
+              placeholderTextColor={colors.textFaint}
+              returnKeyType="default"
+              style={[
+                styles.manualPlaceInput,
+                {
+                  borderColor: colors.line,
+                  color: colors.text,
+                },
+              ]}
+            />
+            <View style={styles.manualPlaceActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="取消手动地点"
+                onPress={() => setShowManualPlace(false)}
+                style={styles.manualPlaceAction}
+              >
+                <Text
+                  style={[
+                    styles.manualPlaceCancel,
+                    { color: colors.textMuted },
+                  ]}
+                >
+                  取消
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="保存手动地点"
+                onPress={saveManualPlace}
+                style={[
+                  styles.manualPlaceSave,
+                  { backgroundColor: colors.seal },
+                ]}
+              >
+                <Text style={styles.manualPlaceSaveText}>写下</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </OverlayPortal>
+      <OverlayPortal
+        name="write-future-sheet"
+        onRequestClose={() => setFutureSheetOpen(false)}
+        visible={futureSheetOpen}
+      >
+        <View style={styles.futureBackdrop}>
+          <Pressable
+            accessibilityLabel="关闭未来日期选择"
+            onPress={() => setFutureSheetOpen(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.futureSheet}>
+            <View style={styles.futureHandle} />
+            <Text style={styles.futureTitle}>寄给未来</Text>
+            <Text style={styles.futureSubtitle}>choose a date to arrive</Text>
+            <View style={styles.futureOptions}>
+              {writeFutureOptions.map(option => {
+                const selected = pendingFutureArriveType === option.id;
+                const custom = option.id === 'custom';
+                return (
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityLabel={option.title}
+                    accessibilityState={{ selected }}
+                    key={option.id}
+                    onPress={() => chooseFuturePreset(option.id)}
+                    style={[
+                      styles.futureOption,
+                      custom && styles.futureOptionCustom,
+                      selected && styles.futureOptionSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.futureOptionTitle,
+                        selected && styles.futureOptionTitleSelected,
+                      ]}
+                    >
+                      {option.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.futureOptionEnglish,
+                        selected && styles.futureOptionEnglishSelected,
+                      ]}
+                    >
+                      {option.english}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.futureSelectedDate}>
+              {formatArrivalDate(pendingFutureArriveAt)}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="选择到达日期与时间"
+              onPress={() => setFutureDateTimePickerOpen(true)}
+              style={styles.futureTimeAction}
+            >
+              <Text style={styles.futureTimeActionText}>
+                一次选择日期与时间
+              </Text>
+            </Pressable>
+            <View style={styles.futureActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="取消未来日期"
+                onPress={() => setFutureSheetOpen(false)}
+                style={styles.futureCancel}
+              >
+                <Text style={styles.futureCancelText}>取消</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="盖上邮戳"
+                onPress={confirmFuture}
+                style={styles.futureConfirm}
+              >
+                <Text style={styles.futureConfirmText}>盖上邮戳</Text>
+              </Pressable>
+            </View>
+            {isFuture ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="不寄了"
+                onPress={clearFuture}
+                style={styles.futureClear}
+              >
+                <Text style={styles.futureClearText}>× 不寄了</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </OverlayPortal>
+      <UnifiedArrivalDateTimePicker
+        date={pendingFutureArriveAt}
+        minimumDate={minimumArrivalDate()}
+        name="write-arrival-date-time"
+        visible={futureDateTimePickerOpen}
+        onCancel={() => {
+          setFutureDateTimePickerOpen(false);
+        }}
+        onConfirm={selectedArrival => {
+          setFutureDateTimePickerOpen(false);
+          setPendingFutureArriveAt(selectedArrival);
+          setPendingFutureArriveType('custom');
+        }}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {flex: 1},
-  page: {flex: 1},
+  safeArea: { flex: 1 },
+  page: { flex: 1 },
   topBar: {
     height: 54,
     flexDirection: 'row',
@@ -1238,8 +1988,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderRadius: 2,
     overflow: 'hidden',
-    boxShadow:
-      '0 1px 3px rgba(58,51,45,0.05), 0 6px 20px rgba(58,51,45,0.04)',
+    boxShadow: '0 1px 3px rgba(58,51,45,0.05), 0 6px 20px rgba(58,51,45,0.04)',
   },
   bindingLine: {
     position: 'absolute',
@@ -1283,7 +2032,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 3,
   },
-  body: {flex: 1, zIndex: 2},
+  body: { flex: 1, zIndex: 2 },
   bodyContent: {
     flexGrow: 1,
     paddingTop: spacing.lg,
@@ -1307,6 +2056,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: 'right',
   },
+  draftStatus: {
+    marginTop: spacing.xs,
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    textAlign: 'right',
+  },
   attachments: {
     zIndex: 3,
     flexShrink: 0,
@@ -1320,9 +2075,9 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 2,
     overflow: 'hidden',
-    transform: [{rotate: '-0.5deg'}],
+    transform: [{ rotate: '-0.5deg' }],
   },
-  photoPreview: {width: '100%', height: '100%'},
+  photoPreview: { width: '100%', height: '100%' },
   inkAttachment: {
     width: 180,
     height: 58,
@@ -1331,7 +2086,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#FEFCF5',
   },
-  inkPreview: {width: '100%', height: '100%'},
+  inkPreview: { width: '100%', height: '100%' },
   removeAttachment: {
     position: 'absolute',
     top: 4,
@@ -1343,7 +2098,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.28)',
   },
-  removeAttachmentText: {color: '#FFFFFF', fontSize: 13, lineHeight: 16},
+  removeAttachmentText: { color: '#FFFFFF', fontSize: 13, lineHeight: 16 },
   audioAttachment: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -1364,10 +2119,221 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  audioAttachmentBar: {width: 1.5, borderRadius: 1},
-  attachmentMeta: {fontFamily: fontFamilies.sans, fontSize: 10},
-  inlineRemove: {paddingHorizontal: spacing.xs, fontSize: 14},
-  locationAttachment: {alignSelf: 'flex-start', paddingVertical: spacing.xxs},
+  audioAttachmentBar: { width: 1.5, borderRadius: 1 },
+  attachmentMeta: { fontFamily: fontFamilies.sans, fontSize: 10 },
+  inlineRemove: { paddingHorizontal: spacing.xs, fontSize: 14 },
+  locationAttachment: { alignSelf: 'flex-start', paddingVertical: spacing.xxs },
+  manualPlaceBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    backgroundColor: 'rgba(32, 27, 23, 0.32)',
+  },
+  manualPlaceSheet: {
+    padding: spacing.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.paper,
+  },
+  manualPlaceTitle: {
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 18,
+  },
+  manualPlaceHint: {
+    marginTop: spacing.xs,
+    fontFamily: fontFamilies.serif,
+    fontSize: 11,
+    lineHeight: 18,
+  },
+  manualPlaceInput: {
+    minHeight: 46,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.paper,
+    fontFamily: fontFamilies.serif,
+    fontSize: 14,
+  },
+  manualPlaceActions: {
+    marginTop: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  manualPlaceAction: {
+    minWidth: 56,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manualPlaceCancel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+  },
+  manualPlaceSave: {
+    minWidth: 70,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.paper,
+  },
+  manualPlaceSaveText: {
+    color: '#FFF8F0',
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 13,
+    letterSpacing: 2,
+  },
+  futureBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(42,35,28,0.38)',
+  },
+  futureSheet: {
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    backgroundColor: '#F5EDDC',
+    boxShadow: '0 -8px 24px rgba(0,0,0,0.15)',
+  },
+  futureHandle: {
+    width: 36,
+    height: 3,
+    alignSelf: 'center',
+    marginBottom: 14,
+    borderRadius: 2,
+    backgroundColor: 'rgba(139,115,85,0.25)',
+  },
+  futureTitle: {
+    textAlign: 'center',
+    color: '#3A332D',
+    fontFamily: fontFamilies.serif,
+    fontSize: 15,
+    letterSpacing: 2,
+  },
+  futureSubtitle: {
+    marginTop: 4,
+    marginBottom: 18,
+    textAlign: 'center',
+    color: '#8B7355',
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 10,
+    fontStyle: 'italic',
+    letterSpacing: 1,
+  },
+  futureOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  futureOption: {
+    minHeight: 58,
+    flexBasis: '30%',
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139,115,85,0.15)',
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  futureOptionCustom: {
+    flexBasis: '100%',
+    minHeight: 48,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(139,115,85,0.3)',
+    backgroundColor: 'transparent',
+  },
+  futureOptionSelected: {
+    borderColor: 'rgba(184,92,56,0.35)',
+    backgroundColor: 'rgba(184,92,56,0.1)',
+  },
+  futureOptionTitle: {
+    color: '#3A332D',
+    fontFamily: fontFamilies.serif,
+    fontSize: 12,
+  },
+  futureOptionTitleSelected: {
+    color: '#B85C38',
+  },
+  futureOptionEnglish: {
+    marginTop: 3,
+    color: '#8B7355',
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 9,
+    fontStyle: 'italic',
+    letterSpacing: 1,
+  },
+  futureOptionEnglishSelected: {
+    color: '#B85C38',
+    opacity: 0.7,
+  },
+  futureSelectedDate: {
+    marginTop: 10,
+    textAlign: 'center',
+    color: '#8B7355',
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  futureTimeAction: {
+    alignSelf: 'center',
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  futureTimeActionText: {
+    color: '#B85C38',
+    fontFamily: fontFamilies.serif,
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  futureActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  futureCancel: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: 'rgba(139,115,85,0.2)',
+    borderRadius: 4,
+  },
+  futureCancelText: {
+    color: '#5C4F42',
+    fontFamily: fontFamilies.serif,
+    fontSize: 13,
+  },
+  futureConfirm: {
+    flex: 2,
+    alignItems: 'center',
+    paddingVertical: 11,
+    borderRadius: 4,
+    backgroundColor: '#B85C38',
+  },
+  futureConfirmText: {
+    color: '#F5EDDC',
+    fontFamily: fontFamilies.serif,
+    fontSize: 13,
+    letterSpacing: 2,
+  },
+  futureClear: {
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  futureClearText: {
+    color: '#8B7355',
+    fontFamily: fontFamilies.englishSerif,
+    fontSize: 10,
+    fontStyle: 'italic',
+  },
   recordingBar: {
     zIndex: 5,
     flexShrink: 0,
@@ -1554,7 +2520,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  tools: {flexDirection: 'row', gap: spacing.xxs},
+  tools: { flexDirection: 'row', gap: spacing.xxs },
   tool: {
     width: 40,
     height: 40,

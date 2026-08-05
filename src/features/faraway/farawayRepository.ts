@@ -34,6 +34,7 @@ export async function getFarawayData(anonymousId?: string, now = new Date()) {
       .query(
         Q.where('deleted', false),
         Q.where('is_future_letter', false),
+        Q.where('status', Q.notEq('draft')),
         Q.sortBy('written_at', Q.desc),
       )
       .fetch(),
@@ -79,7 +80,7 @@ export async function getFarawayData(anonymousId?: string, now = new Date()) {
 export async function getFarawayMemory(memoryId: string) {
   const memory = await database.get<Memory>('memories').find(memoryId);
 
-  if (memory.deleted || memory.isFutureLetter) {
+  if (memory.deleted || memory.isFutureLetter || memory.status === 'draft') {
     throw new Error('这条日迹已不可用');
   }
 

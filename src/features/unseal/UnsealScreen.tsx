@@ -145,46 +145,62 @@ export function UnsealScreen() {
   const haptics = useHaptics();
   const reduceMotion = useReducedMotion();
   const [item, setItem] = useState<LetterWithMemory | null>(null);
+  const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState(false);
   const [opening, setOpening] = useState(false);
   const [opened, setOpened] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const loadRequest = useRef(0);
   const sealProgress = useSharedValue(0);
   const flapProgress = useSharedValue(0);
   const previewProgress = useSharedValue(0);
   const sealedProgress = useSharedValue(1);
   const openProgress = useSharedValue(0);
+  const loadingAnimation = useRef({ openProgress, sealedProgress });
 
   const clearTimers = useCallback(() => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
   }, []);
 
+  const loadLetter = useCallback(async () => {
+    const request = ++loadRequest.current;
+    setLoading(true);
+    setLoadingError(false);
+    try {
+      const result = await getLetterDetail(route.params?.letterId);
+      if (request !== loadRequest.current) {
+        return;
+      }
+      setItem(result);
+      if (result.letter.status === 'opened' || result.letter.openedAt) {
+        setOpened(true);
+        loadingAnimation.current.sealedProgress.value = 0;
+        loadingAnimation.current.openProgress.value = 1;
+      }
+    } catch (error) {
+      console.error('读取信件失败', error);
+      if (request === loadRequest.current) {
+        setLoadingError(true);
+      }
+    } finally {
+      if (request === loadRequest.current) {
+        setLoading(false);
+      }
+    }
+  }, [route.params?.letterId]);
+
   useEffect(() => {
-    let active = true;
-    getLetterDetail(route.params?.letterId)
-      .then(result => {
-        if (!active) {
-          return;
-        }
-        setItem(result);
-        if (result.letter.status === 'opened' || result.letter.openedAt) {
-          setOpened(true);
-          sealedProgress.value = 0;
-          openProgress.value = 1;
-        }
-      })
-      .catch(error => {
-        console.error('读取信件失败', error);
-        if (active) {
-          setLoadingError(true);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [openProgress, route.params?.letterId, sealedProgress]);
+    loadLetter().catch(() => undefined);
+  }, [loadLetter]);
+
+  useEffect(
+    () => () => {
+      loadRequest.current += 1;
+    },
+    [],
+  );
 
   useEffect(
     () => () => {
@@ -227,11 +243,15 @@ export function UnsealScreen() {
   }));
   const sealedStyle = useAnimatedStyle(() => ({
     opacity: sealedProgress.value,
-    transform: [{ scale: 0.96 + sealedProgress.value * 0.04 }],
+    transform: reduceMotion
+      ? []
+      : [{ scale: 0.96 + sealedProgress.value * 0.04 }],
   }));
   const openStyle = useAnimatedStyle(() => ({
     opacity: openProgress.value,
-    transform: [{ translateY: -20 * (1 - openProgress.value) }],
+    transform: reduceMotion
+      ? []
+      : [{ translateY: -20 * (1 - openProgress.value) }],
   }));
 
   const schedule = (callback: () => void, delay: number) => {
@@ -297,7 +317,11 @@ export function UnsealScreen() {
 
   const goBack = () => {
     clearTimers();
-    navigation.popTo('Main', {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.replace('Main', {
       screen: route.params?.source === 'daily' ? 'Daily' : 'Letters',
     });
   };
@@ -360,16 +384,23 @@ export function UnsealScreen() {
         <Text style={styles.errorText}>这封信暂时没有靠岸</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="返回"
+          accessibilityLabel="重新读取信件"
+          onPress={() => loadLetter().catch(() => undefined)}
+        >
+          <Text style={styles.errorRetry}>再捞一次</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="收回"
           onPress={goBack}
         >
-          <Text style={styles.errorBack}>返回</Text>
+          <Text style={styles.errorBack}>收回</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
-  if (!item) {
+  if (loading || !item) {
     return (
       <SafeAreaView style={styles.errorScreen}>
         <Text style={styles.errorText}>正在从河面捞起这封信……</Text>
@@ -473,7 +504,7 @@ export function UnsealScreen() {
             style={styles.back}
           >
             <Text style={styles.backIcon}>‹</Text>
-            <Text style={styles.backText}>{sourceLabel}</Text>
+            <Text style={styles.backText}>收回</Text>
           </Pressable>
         ) : null}
       </SafeAreaView>
@@ -780,5 +811,10 @@ const styles = StyleSheet.create({
     color: primitiveColors.accent,
     fontFamily: fontFamilies.sans,
     fontSize: fontSizes.meta,
+  },
+  errorRetry: {
+    color: primitiveColors.accent,
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: fontSizes.body,
   },
 });

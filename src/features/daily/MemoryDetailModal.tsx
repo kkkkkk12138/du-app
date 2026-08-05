@@ -13,7 +13,6 @@ import {
   Alert,
   Clipboard,
   Image,
-  Modal,
   PermissionsAndroid,
   Platform,
   Pressable,
@@ -34,6 +33,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureRef } from 'react-native-view-shot';
 
+import { OverlayPortal } from '../../components/OverlayHost';
 import { useToast } from '../../components/Toast';
 import { Letter, Memory } from '../../db/models';
 import { useHaptics } from '../../hooks/useHaptics';
@@ -42,7 +42,6 @@ import {
   requestLetterNotificationAccess,
   scheduleLetterArrivalNotification,
 } from '../../services/letterNotifications';
-import { useSettingsStore } from '../../store/useSettingsStore';
 import { minimumArrivalDate } from '../newLetter/futureLetterLogic';
 import { formatMemoryTime, parseMemoryTags } from './dailyContext';
 import { MemoryExportCard } from './MemoryExportCard';
@@ -67,6 +66,7 @@ import {
 } from './memoryDetailRepository';
 
 type MemoryDetailModalProps = {
+  contextLabel?: string;
   memory: Memory | null;
   onDismiss: () => void;
   onDeleted?: () => void;
@@ -82,6 +82,7 @@ const moodLabels: Record<string, string> = {
 };
 
 export function MemoryDetailModal({
+  contextLabel,
   memory,
   onDismiss,
   onDeleted,
@@ -90,9 +91,6 @@ export function MemoryDetailModal({
   const { show: showToast } = useToast();
   const haptics = useHaptics();
   const reduceMotion = useReducedMotion();
-  const letterReminderTime = useSettingsStore(
-    state => state.letterReminderTime,
-  );
   const exportRef = useRef<View>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
@@ -244,7 +242,6 @@ export function MemoryDetailModal({
           await scheduleLetterArrivalNotification({
             letterId: nextStamp.id,
             arriveDate: nextStamp.arriveDate,
-            reminderTime: letterReminderTime,
           });
         }
       } catch (error) {
@@ -430,10 +427,9 @@ export function MemoryDetailModal({
   const hasTags = Boolean(tags.length || memory.mood);
 
   return (
-    <Modal
-      animationType="none"
+    <OverlayPortal
+      name="memory-detail"
       onRequestClose={sheet ? () => setSheet(null) : close}
-      statusBarTranslucent
       visible
     >
       <View
@@ -472,21 +468,20 @@ export function MemoryDetailModal({
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.exportPage}>
+              {contextLabel ? (
+                <Text style={styles.contextLabel}>{contextLabel}</Text>
+              ) : null}
               <View style={styles.dateHeader}>
-                <View>
-                  <Text style={styles.monthYear}>
-                    {dateContext.monthName.toUpperCase()} · {dateContext.year}
-                  </Text>
-                  <View style={styles.dayRow}>
-                    <Text style={styles.dayNumber}>{dateContext.day}</Text>
-                    <View style={styles.dayMeta}>
-                      <Text style={styles.weekday}>{dateContext.weekday}</Text>
-                      <Text style={styles.lunar}>{dateContext.lunar}</Text>
-                      <Text style={styles.solarTerm}>
-                        {dateContext.solarTerm}
-                      </Text>
-                    </View>
-                  </View>
+                <Text style={styles.monthYear}>
+                  {dateContext.monthName.toUpperCase()} · {dateContext.year}
+                </Text>
+                <Text style={styles.dayNumber}>{dateContext.day}</Text>
+                <View style={styles.dayMeta}>
+                  <Text style={styles.weekday}>{dateContext.weekday}</Text>
+                  <View style={styles.dateDot} />
+                  <Text style={styles.lunar}>{dateContext.lunar}</Text>
+                  <View style={styles.dateDot} />
+                  <Text style={styles.solarTerm}>{dateContext.solarTerm}</Text>
                 </View>
                 <View style={styles.seasonSeal}>
                   <Text style={styles.seasonSealText}>
@@ -496,6 +491,12 @@ export function MemoryDetailModal({
               </View>
 
               <View style={styles.note}>
+                <View pointerEvents="none" style={styles.noteRules}>
+                  {Array.from({ length: 20 }, (_, index) => (
+                    <View key={index} style={styles.noteRule} />
+                  ))}
+                </View>
+                <View pointerEvents="none" style={styles.noteHeaderRule} />
                 <View style={styles.noteTape} />
                 <View style={styles.cornerMark} />
                 <Text
@@ -696,6 +697,6 @@ export function MemoryDetailModal({
           </Animated.View>
         ) : null}
       </View>
-    </Modal>
+    </OverlayPortal>
   );
 }

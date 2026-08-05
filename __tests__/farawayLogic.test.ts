@@ -56,7 +56,7 @@ test('formats a current stay and a completed visit range', () => {
   expect(formatPlaceDateRange(places[2])).toBe('2025.8');
 });
 
-test('groups memories only through persisted place ids', () => {
+test('shows only cities backed by active memories', () => {
   const data = buildFarawayViewData({
     user: {
       currentCityId: 'shanghai',
@@ -89,7 +89,7 @@ test('groups memories only through persisted place ids', () => {
     now: new Date(2026, 7, 3),
   });
 
-  expect(data.cityCount).toBe(3);
+  expect(data.cityCount).toBe(2);
   expect(data.locatedMemoryCount).toBe(2);
   expect(data.yearsLabel).toBe('1年');
   expect(data.current?.memories.map(memory => memory.id)).toEqual([
@@ -98,5 +98,28 @@ test('groups memories only through persisted place ids', () => {
   expect(data.visited[0].memories.map(memory => memory.id)).toEqual([
     'tokyo-memory',
   ]);
-  expect(data.hometown?.memories).toHaveLength(0);
+  expect(data.hometown).toBeUndefined();
+  expect(data.current?.dateRange).toBe('2026.8 — 至今');
+});
+
+test('removes a city and its related role after its last memory is deleted', () => {
+  const data = buildFarawayViewData({
+    user: {
+      currentCityId: 'shanghai',
+      hometownId: 'changsha',
+      currentCityArrival: new Date(2025, 1, 20),
+    },
+    places,
+    memories: [],
+    now: new Date(2026, 7, 3),
+  });
+
+  expect(data).toEqual({
+    current: undefined,
+    hometown: undefined,
+    visited: [],
+    cityCount: 0,
+    locatedMemoryCount: 0,
+    yearsLabel: undefined,
+  });
 });

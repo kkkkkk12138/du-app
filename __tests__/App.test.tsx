@@ -20,6 +20,7 @@ import {
   getLetterDetail,
   getLettersData,
 } from '../src/features/letters/lettersRepository';
+import { createFutureLetter } from '../src/features/newLetter/futureLetterRepository';
 import { updateProfile } from '../src/features/profile/profileRepository';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
@@ -36,6 +37,10 @@ jest.mock('../src/db/database', () => ({
   database: {},
 }));
 
+jest.mock('../src/navigation/linking', () => ({
+  linking: undefined,
+}));
+
 jest.mock('@nozbe/watermelondb/react', () => {
   const ReactModule = require('react');
 
@@ -47,6 +52,10 @@ jest.mock('@nozbe/watermelondb/react', () => {
 
 jest.mock('../src/db/seed', () => ({
   seedDevelopmentData: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../src/db/productExamples', () => ({
+  seedProductExamples: jest.fn().mockResolvedValue(false),
 }));
 
 jest.mock('../src/db/settingsRepository', () => ({
@@ -136,8 +145,19 @@ jest.mock('../src/features/profile/profileRepository', () => ({
     memoryCount: 8,
     placeCount: 3,
     letterCount: 2,
+    questCount: 1,
+    wishCount: 2,
   }),
   updateProfile: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../src/features/newLetter/futureLetterRepository', () => ({
+  createFutureLetter: jest.fn().mockResolvedValue({
+    letter: {
+      id: 'future-letter-id',
+      arriveDate: new Date(2027, 7, 2),
+    },
+  }),
 }));
 
 jest.mock('../src/services/anonymousIdentity', () => ({
@@ -147,14 +167,17 @@ jest.mock('../src/services/anonymousIdentity', () => ({
   }),
 }));
 
-beforeEach(() => {
-  useSettingsStore.setState({
-    hasHydrated: true,
-    anonymousId: null,
-    duNumber: null,
-    themeMode: 'system',
-    onboardingCompleted: false,
-    privacyAcceptedAt: null,
+beforeEach(async () => {
+  await ReactTestRenderer.act(async () => {
+    useSettingsStore.setState({
+      hasHydrated: true,
+      anonymousId: null,
+      duNumber: null,
+      themeMode: 'system',
+      onboardingCompleted: false,
+      privacyAcceptedAt: null,
+    });
+    await Promise.resolve();
   });
 });
 
@@ -173,7 +196,7 @@ async function renderApp() {
 async function completeOnboarding(
   renderer: ReactTestRenderer.ReactTestRenderer,
 ) {
-  for (let index = 0; index < 2; index += 1) {
+  for (let index = 0; index < 3; index += 1) {
     await ReactTestRenderer.act(() => {
       renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
     });
@@ -217,13 +240,32 @@ test('blocks the home screen until privacy consent is accepted', async () => {
   });
 });
 
+test('explains seeded reference content once during onboarding', async () => {
+  const renderer = await renderApp();
+
+  for (let index = 0; index < 2; index += 1) {
+    await ReactTestRenderer.act(() => {
+      renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
+    });
+  }
+
+  expect(
+    renderer.root.findByProps({
+      children: '初见的内容，只作示范',
+    }),
+  ).toBeTruthy();
+
+  await ReactTestRenderer.act(() => renderer.unmount());
+});
+
 test('opens the privacy policy before onboarding consent', async () => {
   const renderer = await renderApp();
 
-  await ReactTestRenderer.act(() => {
-    renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
-    renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
-  });
+  for (let index = 0; index < 3; index += 1) {
+    await ReactTestRenderer.act(() => {
+      renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
+    });
+  }
   await ReactTestRenderer.act(() => {
     renderer.root
       .findByProps({ accessibilityLabel: '阅读隐私政策' })
@@ -259,8 +301,10 @@ test('switches all tabs and exposes the prototype profile settings', async () =>
   expect(
     renderer.root.findByProps({ accessibilityLabel: '此刻内容' }),
   ).toBeTruthy();
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     renderer.root.findByProps({ accessibilityLabel: '收起' }).props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
   });
 
   await ReactTestRenderer.act(async () => {
@@ -276,11 +320,37 @@ test('switches all tabs and exposes the prototype profile settings', async () =>
     renderer.root.findByProps({ accessibilityLabel: '深色外观' }),
   ).toBeTruthy();
   expect(
-    renderer.root.findAllByProps({ accessibilityLabel: '备份与导出' }),
+    renderer.root.findAllByProps({ accessibilityLabel: 'iCloud 备份' }),
   ).toHaveLength(0);
   expect(
     renderer.root.findAllByProps({ accessibilityLabel: '导出我的数据' }),
   ).toHaveLength(0);
+  expect(
+    renderer.root.findAllByProps({ accessibilityLabel: '我的拼贴本' }),
+  ).toHaveLength(0);
+  expect(
+    renderer.root.findAllByProps({ accessibilityLabel: '我的地图' }),
+  ).toHaveLength(0);
+
+  await ReactTestRenderer.act(async () => {
+    renderer.root.findByProps({ accessibilityLabel: '关于渡' }).props.onPress();
+    await Promise.resolve();
+  });
+  await ReactTestRenderer.act(async () => {
+    renderer.root
+      .findByProps({ accessibilityLabel: '数据与隐私' })
+      .props.onPress();
+    await Promise.resolve();
+  });
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '完整备份' }),
+  ).toBeTruthy();
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '可读文稿' }),
+  ).toBeTruthy();
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '恢复完整备份' }),
+  ).toBeTruthy();
 
   await ReactTestRenderer.act(() => {
     renderer.unmount();
@@ -329,7 +399,7 @@ test('opens every memory as a detail card with handwriting and location', async 
     typeof getDailyData
   >;
   const writtenAt = new Date(2026, 7, 2, 18, 30);
-  getDailyDataMock.mockResolvedValueOnce({
+  getDailyDataMock.mockResolvedValue({
     memories: [
       {
         id: 'detail-memory',
@@ -357,15 +427,16 @@ test('opens every memory as a detail card with handwriting and location', async 
     await Promise.resolve();
   });
 
-  expect(
-    renderer.root.findByProps({ accessibilityLabel: '手书缩略图' }),
-  ).toBeTruthy();
+  const contentNode = renderer.root.findByProps({
+    children: '这一刻有手书，也有真实坐标。',
+  });
+  let pressable = contentNode.parent;
+  while (pressable && typeof pressable.props.onPress !== 'function') {
+    pressable = pressable.parent;
+  }
+  expect(pressable).toBeTruthy();
   await ReactTestRenderer.act(async () => {
-    renderer.root
-      .findByProps({
-        accessibilityLabel: '文字日迹，这一刻有手书，也有真实坐标。',
-      })
-      .props.onPress();
+    pressable?.props.onPress();
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -384,6 +455,10 @@ test('opens every memory as a detail card with handwriting and location', async 
 
   await ReactTestRenderer.act(() => {
     renderer.unmount();
+  });
+  getDailyDataMock.mockResolvedValue({
+    memories: [],
+    arrivedLetter: null,
   });
 });
 
@@ -412,7 +487,7 @@ test('opens an archived letter and returns through the mailbox header', async ()
       isFutureLetter: true,
       deleted: false,
     },
-  } as never;
+  } as any;
   const getLettersDataMock = getLettersData as jest.MockedFunction<
     typeof getLettersData
   >;
@@ -445,16 +520,25 @@ test('opens an archived letter and returns through the mailbox header', async ()
   });
 
   expect(
-    renderer.root.findByProps({ accessibilityLabel: '返回信箱' }),
+    renderer.root.findAllByProps({ accessibilityLabel: '合上信件' }).length,
+  ).toBeGreaterThan(0);
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '已拆信详情' }),
   ).toBeTruthy();
   expect(
     renderer.root.findAllByProps({ children: '这是一封已经拆开的原信。' })
       .length,
   ).toBeGreaterThan(0);
+  expect(
+    renderer.root.findAllByProps({ children: 'AUG 2025' }).length,
+  ).toBeGreaterThan(0);
+  expect(renderer.root.findAllByProps({ children: 'AUG 2026' })).toHaveLength(
+    0,
+  );
 
   await ReactTestRenderer.act(async () => {
     renderer.root
-      .findByProps({ accessibilityLabel: '返回信箱' })
+      .findAllByProps({ accessibilityLabel: '合上信件' })[0]
       .props.onPress();
     await Promise.resolve();
   });
@@ -472,6 +556,126 @@ test('opens an archived letter and returns through the mailbox header', async ()
   getLetterDetailMock.mockRejectedValue(new Error('没有可拆的信'));
 });
 
+test('renders distinct prototype sheets for traveling and arriving letters', async () => {
+  const getLettersDataMock = getLettersData as jest.MockedFunction<
+    typeof getLettersData
+  >;
+  const memory = {
+    id: 'future-memory',
+    type: 'text',
+    content: '留给未来的这一封信。',
+    placeDetail: '上海',
+    createdAt: new Date(2026, 7, 4),
+    updatedAt: new Date(2026, 7, 4),
+    writtenAt: new Date(2026, 7, 4),
+  } as any;
+  const travelingItem = {
+    letter: {
+      id: 'traveling-letter',
+      memoryId: 'future-memory',
+      sentAt: new Date(2026, 7, 4),
+      arriveDate: new Date(2027, 7, 4),
+      toName: '未来的自己',
+      status: 'traveling',
+    },
+    memory,
+  } as any;
+
+  getLettersDataMock.mockResolvedValue({
+    arriving: [],
+    traveling: [travelingItem],
+    opened: [],
+    tomorrowCount: 0,
+  });
+  const travelingRenderer = await renderApp();
+  await completeOnboarding(travelingRenderer);
+  await ReactTestRenderer.act(async () => {
+    travelingRenderer.root
+      .findByProps({ accessibilityLabel: '信' })
+      .props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  const travelingCard = travelingRenderer.root.find(
+    node =>
+      typeof node.props.accessibilityLabel === 'string' &&
+      node.props.accessibilityLabel.includes('还有') &&
+      node.props.accessibilityLabel.includes('天到达'),
+  );
+  await ReactTestRenderer.act(() => travelingCard.props.onPress());
+  expect(
+    travelingRenderer.root.findByProps({
+      accessibilityLabel: '在途信详情',
+    }),
+  ).toBeTruthy();
+  expect(
+    travelingRenderer.root.find(
+      node =>
+        Array.isArray(node.props.children) &&
+        node.props.children.join('') === '「写给未来的自己」尚在山水间跋涉',
+    ),
+  ).toBeTruthy();
+  expect(
+    travelingRenderer.root.findAllByProps({
+      accessibilityLabel: '这封信到达时提醒',
+    }),
+  ).toHaveLength(0);
+  expect(
+    travelingRenderer.root.findAllByProps({
+      accessibilityLabel: '删除这封在途信',
+    }),
+  ).toHaveLength(0);
+  await ReactTestRenderer.act(() => travelingRenderer.unmount());
+
+  const arrivingItem = {
+    ...travelingItem,
+    letter: {
+      ...travelingItem.letter,
+      id: 'arriving-letter',
+      arriveDate: new Date(2026, 7, 4),
+      status: 'arrived',
+    },
+  } as any;
+  getLettersDataMock.mockResolvedValue({
+    arriving: [arrivingItem],
+    traveling: [],
+    opened: [],
+    tomorrowCount: 0,
+  });
+  const arrivingRenderer = await renderApp();
+  await ReactTestRenderer.act(async () => {
+    arrivingRenderer.root
+      .findByProps({ accessibilityLabel: '信' })
+      .props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await ReactTestRenderer.act(() => {
+    arrivingRenderer.root
+      .findByProps({ accessibilityLabel: '拆开写给未来的自己' })
+      .props.onPress();
+  });
+  expect(
+    arrivingRenderer.root.findByProps({
+      accessibilityLabel: '将至信详情',
+    }),
+  ).toBeTruthy();
+  expect(
+    arrivingRenderer.root.findByProps({ children: '有信将至' }),
+  ).toBeTruthy();
+  expect(
+    arrivingRenderer.root.findByProps({ children: '火漆尚温，宜静候' }),
+  ).toBeTruthy();
+  await ReactTestRenderer.act(() => arrivingRenderer.unmount());
+
+  getLettersDataMock.mockResolvedValue({
+    arriving: [],
+    traveling: [],
+    opened: [],
+    tomorrowCount: 0,
+  });
+});
+
 test('enables the daily reminder with the prototype inline time picker', async () => {
   const requestNotificationMock =
     notifee.requestPermission as jest.MockedFunction<
@@ -480,9 +684,12 @@ test('enables the daily reminder with the prototype inline time picker', async (
   requestNotificationMock.mockResolvedValueOnce({
     authorizationStatus: 1,
   } as never);
-  useSettingsStore.setState({
-    dailyReminderOn: false,
-    dailyReminderTime: '22:30',
+  await ReactTestRenderer.act(async () => {
+    useSettingsStore.setState({
+      dailyReminderOn: false,
+      dailyReminderTime: '22:30',
+    });
+    await Promise.resolve();
   });
 
   const renderer = await renderApp();
@@ -527,7 +734,10 @@ test('keeps daily reminders off when notification access is denied', async () =>
   requestNotificationMock.mockResolvedValueOnce({
     authorizationStatus: 0,
   } as never);
-  useSettingsStore.setState({ dailyReminderOn: false });
+  await ReactTestRenderer.act(async () => {
+    useSettingsStore.setState({ dailyReminderOn: false });
+    await Promise.resolve();
+  });
 
   const renderer = await renderApp();
   await completeOnboarding(renderer);
@@ -652,9 +862,12 @@ test('writes real content and keeps future letters out of Memory storage', async
     renderer.unmount();
   });
 
-  useSettingsStore.setState({
-    onboardingCompleted: false,
-    privacyAcceptedAt: null,
+  await ReactTestRenderer.act(async () => {
+    useSettingsStore.setState({
+      onboardingCompleted: false,
+      privacyAcceptedAt: null,
+    });
+    await Promise.resolve();
   });
   const futureRenderer = await renderApp();
   await completeOnboarding(futureRenderer);
@@ -668,12 +881,26 @@ test('writes real content and keeps future letters out of Memory storage', async
       .findByProps({ accessibilityLabel: '未来信模式' })
       .props.onPress();
   });
-  createMemoryMock.mockClear();
+  for (const label of ['一年后', '半年后', '三个月后', '自选']) {
+    expect(
+      futureRenderer.root.findByProps({ accessibilityLabel: label }),
+    ).toBeTruthy();
+  }
   await ReactTestRenderer.act(() => {
     futureRenderer.root
-      .findByProps({ accessibilityLabel: '继续写未来信' })
+      .findByProps({ accessibilityLabel: '一年后' })
       .props.onPress();
   });
+  await ReactTestRenderer.act(() => {
+    futureRenderer.root
+      .findByProps({ accessibilityLabel: '盖上邮戳' })
+      .props.onPress();
+  });
+  createMemoryMock.mockClear();
+  const createFutureLetterMock = createFutureLetter as jest.MockedFunction<
+    typeof createFutureLetter
+  >;
+  createFutureLetterMock.mockClear();
   expect(
     futureRenderer.root.findByProps({ accessibilityLabel: '此刻内容' }),
   ).toBeTruthy();
@@ -686,29 +913,21 @@ test('writes real content and keeps future letters out of Memory storage', async
     futureRenderer.root
       .findByProps({ accessibilityLabel: '继续写未来信' })
       .props.onPress();
-    await new Promise<void>(resolve => setTimeout(resolve, 250));
+    await new Promise<void>(resolve => setTimeout(resolve, 1300));
   });
   expect(createMemoryMock).not.toHaveBeenCalled();
+  expect(createFutureLetterMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      draft: expect.objectContaining({ content: '留给一年后的我。' }),
+      arriveType: 'one_year',
+    }),
+  );
   expect(
-    futureRenderer.root.findByProps({ accessibilityLabel: '返回此刻' }),
+    futureRenderer.root.findAllByProps({ accessibilityLabel: '返回此刻' }),
+  ).toHaveLength(0);
+  expect(
+    futureRenderer.root.findByProps({ accessibilityLabel: '信' }),
   ).toBeTruthy();
-  expect(
-    futureRenderer.root.findByProps({ children: '留给一年后的我。' }),
-  ).toBeTruthy();
-  for (const label of ['一年后', '半年后', '三个月后', '自定义']) {
-    expect(
-      futureRenderer.root.findByProps({ accessibilityLabel: label }),
-    ).toBeTruthy();
-  }
-  await ReactTestRenderer.act(() => {
-    futureRenderer.root
-      .findByProps({ accessibilityLabel: '返回此刻' })
-      .props.onPress();
-  });
-  expect(
-    futureRenderer.root.findByProps({ accessibilityLabel: '此刻内容' }).props
-      .value,
-  ).toBe('留给一年后的我。');
 
   await ReactTestRenderer.act(() => {
     futureRenderer.unmount();

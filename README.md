@@ -1,101 +1,74 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 渡
 
-# Project Notes
+“渡”是一款本地优先的 iOS 日记与未来信应用，使用 React Native、WatermelonDB 和原生 iOS 能力构建。
 
-- [Product backlog and data authenticity rules](docs/PRODUCT_BACKLOG.md)
+当前发布优先级为 iOS。Android 源码保留在仓库中，但尚未完成本机 Gradle 构建和发布验收。
 
-# Getting Started
+## 当前能力
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+- 日迹、信件、未来信、念想与副本
+- 书架、书内续写与自由散页
+- 本地照片、录音、手书和位置附件
+- 完整本地备份、校验、恢复与失败回滚
+- 生物识别锁、通知提醒和 Reduce Motion
 
-## Step 1: Start Metro
+用户正文和附件默认保存在设备本地。当前版本不提供账号同步，不应对外宣称数据已自动上传云端。
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## iOS 开发
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+环境要求：
+
+- macOS
+- Node.js 22.11 或更高版本
+- Xcode 与对应 iOS Simulator
+- CocoaPods
+
+安装依赖：
 
 ```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+npm ci
+cd ios && pod install
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+运行：
 
 ```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+验证：
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```sh
+npm test -- --runInBand
+npx tsc --noEmit
+npx eslint . --max-warnings=0
+```
 
-## Step 3: Modify your app
+## 发布前必填
 
-Now that you have successfully run the app, let's make changes!
+仓库不会包含证书、描述文件、App Store Connect API 密钥、Firebase 配置或其他私密凭据。首次归档前需要在本机补充：
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+1. 将示例 Bundle ID 改为正式且长期不变的 Bundle ID。
+2. 在 Xcode 中选择有效的 Apple Developer Team。
+3. 补齐 `AppIcon.appiconset` 的正式图标文件。
+4. 从 Firebase 下载 `GoogleService-Info.plist` 并放到 iOS 工程中；该文件已被 `.gitignore` 排除。
+5. 将公开隐私政策、服务条款和支持页面 URL 填入 App Store Connect。
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+逐步操作见 [iOS App Store 上架指导书](docs/IOS_PERSONAL_DEVELOPER_LAUNCH.md)。
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+商店资料草稿见 [App Store 资料模板](docs/app-store/APP_STORE_METADATA.md)。
 
-## Congratulations! :tada:
+## 数据与安全
 
-You've successfully run and modified your React Native App. :partying_face:
+- 数据库 schema 当前为 v13。
+- 完整备份使用 `.du-backup.json`，附件带 SHA-256 校验。
+- 恢复前会生成救援备份，失败时自动回滚。
+- 不要提交 `.env`、`GoogleService-Info.plist`、`.p8`、`.p12`、`.cer`、`.mobileprovision` 或生产签名文件。
 
-### Now what?
+## 当前验证
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- Jest：35 个测试套件，120 项测试通过
+- TypeScript：通过
+- 严格 ESLint：通过
+- iOS Release Simulator：`arm64 + x86_64` 构建通过
+- Android：尚未完成本机 JDK/Gradle 构建

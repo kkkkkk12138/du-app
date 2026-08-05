@@ -29,6 +29,10 @@ export function FeedbackScreen() {
       toast.show('请至少写下 5 个字');
       return;
     }
+    if (message.length > 2000) {
+      toast.show('反馈内容最多 2000 个字');
+      return;
+    }
     setSharing(true);
     try {
       await Share.share({
@@ -85,8 +89,8 @@ export function FeedbackScreen() {
         </Text>
         <TextInput
           accessibilityLabel="反馈内容"
+          defaultValue=""
           multiline
-          maxLength={2000}
           onChangeText={setContent}
           placeholder="写下问题、建议，或复现步骤…"
           placeholderTextColor={colors.textFaint}
@@ -96,7 +100,6 @@ export function FeedbackScreen() {
             { backgroundColor: colors.surface, color: colors.text },
           ]}
           textAlignVertical="top"
-          value={content}
         />
         <Text style={[styles.count, { color: colors.textFaint }]}>
           {content.length} / 2000

@@ -8,7 +8,7 @@ import AudioRecord from 'react-native-audio-record';
 
 import {requestMicrophoneAccess} from '../services/contextPermissions';
 import {
-  archiveMediaFile,
+  archiveDraftMediaFile,
   isUsableAudioFile,
   removeMediaFile,
 } from '../services/mediaStorage';
@@ -31,6 +31,7 @@ export type AudioAttachment = {
 export function useAudioRecorder(
   onComplete: (attachment: AudioAttachment) => void,
   onError: (message: string) => void,
+  onPermissionBlocked?: () => void,
 ) {
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -40,8 +41,10 @@ export function useAudioRecorder(
   const stoppingRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
+  const onPermissionBlockedRef = useRef(onPermissionBlocked);
   onCompleteRef.current = onComplete;
   onErrorRef.current = onError;
+  onPermissionBlockedRef.current = onPermissionBlocked;
 
   const stop = useCallback(
     async (discard = false) => {
@@ -60,7 +63,7 @@ export function useAudioRecorder(
             onErrorRef.current('没有录到声音，请确认麦克风后再试一次');
             return;
           }
-          const path = await archiveMediaFile(
+          const path = await archiveDraftMediaFile(
             temporaryPath,
             'audio',
             'wav',
@@ -85,7 +88,12 @@ export function useAudioRecorder(
     if (recordingRef.current) {
       return;
     }
-    if (!(await requestMicrophoneAccess())) {
+    const permission = await requestMicrophoneAccess();
+    if (permission === 'blocked') {
+      onPermissionBlockedRef.current?.();
+      return;
+    }
+    if (permission !== 'granted') {
       onErrorRef.current('没有麦克风权限，暂时不能录音');
       return;
     }

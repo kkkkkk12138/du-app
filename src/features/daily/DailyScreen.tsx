@@ -23,17 +23,11 @@ import {
   useRoute,
 } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, {
-  Defs,
-  LinearGradient,
-  RadialGradient,
-  Rect,
-  Stop,
-} from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { Memory } from '../../db/models';
-import { useHaptics } from '../../hooks/useHaptics';
 import {
   MainTabParamList,
   RootStackParamList,
@@ -60,31 +54,6 @@ type DailyNavigation = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 type DailyRoute = RouteProp<MainTabParamList, 'Daily'>;
-
-function GlowBackground() {
-  const { isDark } = useTheme();
-  return (
-    <Svg
-      pointerEvents="none"
-      preserveAspectRatio="none"
-      style={StyleSheet.absoluteFill}
-      viewBox="0 0 100 100"
-    >
-      <Defs>
-        <LinearGradient id="letterGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-          <Stop offset="0" stopColor={isDark ? '#3A3028' : '#FBF4E8'} />
-          <Stop offset="1" stopColor={isDark ? '#2A2520' : '#F5EBD8'} />
-        </LinearGradient>
-        <RadialGradient id="promptGlow" cx="100%" cy="0%" r="22%">
-          <Stop offset="0" stopColor="#C0392B" stopOpacity={0.06} />
-          <Stop offset="1" stopColor="#C0392B" stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Rect width={100} height={100} fill="url(#letterGlow)" />
-      <Rect width={100} height={100} fill="url(#promptGlow)" />
-    </Svg>
-  );
-}
 
 function PhenologyBackground() {
   return (
@@ -113,9 +82,14 @@ function ArrivedLetterNudge({
   onOpen: () => void;
 }) {
   const { colors } = useTheme();
+  const reduceMotion = useReducedMotion();
   const pulse = useRef(new Animated.Value(0.55)).current;
 
   useEffect(() => {
+    if (reduceMotion) {
+      pulse.setValue(1);
+      return;
+    }
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -132,7 +106,7 @@ function ArrivedLetterNudge({
     );
     animation.start();
     return () => animation.stop();
-  }, [pulse]);
+  }, [pulse, reduceMotion]);
 
   return (
     <View
@@ -167,8 +141,7 @@ function ArrivedLetterNudge({
 export function DailyScreen() {
   const navigation = useNavigation<DailyNavigation>();
   const route = useRoute<DailyRoute>();
-  const { colors, isDark } = useTheme();
-  const haptics = useHaptics();
+  const { colors } = useTheme();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [arrivedLetter, setArrivedLetter] = useState<ArrivedLetter | null>(
     null,
@@ -180,11 +153,16 @@ export function DailyScreen() {
   );
   const [freshnessNow, setFreshnessNow] = useState(() => Date.now());
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [detailContext, setDetailContext] = useState<string>();
   const now = useDailyClock();
+  const reduceMotion = useReducedMotion();
   const loadedDay = useRef(
     `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`,
   );
-  const context = useMemo(() => getDailyContext(now), [now]);
+  const computedContext = useMemo(() => getDailyContext(now), [now]);
+  const [context, setContext] = useState(computedContext);
+  const contextOpacity = useRef(new Animated.Value(1)).current;
+  const contextTranslate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const nextId = route.params?.newMemoryId;
@@ -221,11 +199,61 @@ export function DailyScreen() {
   useEffect(() => {
     const currentDay = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
     if (currentDay === loadedDay.current) {
+      setContext(computedContext);
       return;
     }
     loadedDay.current = currentDay;
-    load();
-  }, [load, now]);
+    if (reduceMotion) {
+      setContext(computedContext);
+      load();
+      return;
+    }
+    const exit = Animated.parallel([
+      Animated.timing(contextOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contextTranslate, {
+        toValue: -20,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]);
+    let enter: Animated.CompositeAnimation | undefined;
+    exit.start(({ finished }) => {
+      if (!finished) {
+        return;
+      }
+      setContext(computedContext);
+      load();
+      contextTranslate.setValue(20);
+      enter = Animated.parallel([
+        Animated.timing(contextOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contextTranslate, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]);
+      enter.start();
+    });
+    return () => {
+      exit.stop();
+      enter?.stop();
+    };
+  }, [
+    computedContext,
+    contextOpacity,
+    contextTranslate,
+    load,
+    now,
+    reduceMotion,
+  ]);
 
   const oldMemory = useMemo(() => {
     const monthAgo = now.getTime() - 30 * 86_400_000;
@@ -306,8 +334,8 @@ export function DailyScreen() {
     }
     return summaries;
   }, [memories]);
-
-  const openMemory = useCallback((memory: Memory) => {
+  const openMemory = useCallback((memory: Memory, contextLabel?: string) => {
+    setDetailContext(contextLabel);
     setSelectedMemory(memory);
   }, []);
   const renderMemory = useCallback(
@@ -335,7 +363,15 @@ export function DailyScreen() {
 
   const header = (
     <>
-      <View style={styles.greetingBlock}>
+      <Animated.View
+        style={[
+          styles.greetingBlock,
+          {
+            opacity: contextOpacity,
+            transform: [{ translateY: contextTranslate }],
+          },
+        ]}
+      >
         <Text style={[styles.date, { color: colors.textFaint }]}>
           {context.headerDate.toUpperCase()}
         </Text>
@@ -349,9 +385,18 @@ export function DailyScreen() {
         <Text style={[styles.subtitle, { color: colors.textMuted }]}>
           {context.subtitle}
         </Text>
-      </View>
+      </Animated.View>
 
-      <View style={[styles.phenology, styles.phenologyLightBorder]}>
+      <Animated.View
+        style={[
+          styles.phenology,
+          styles.phenologyLightBorder,
+          {
+            opacity: contextOpacity,
+            transform: [{ translateY: contextTranslate }],
+          },
+        ]}
+      >
         <PhenologyBackground />
         <Text style={[styles.phenologyIcon, { color: primitiveColors.sage }]}>
           {context.phenology.icon}
@@ -364,46 +409,14 @@ export function DailyScreen() {
             {context.phenology.yi}
           </Text>
         </View>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="落一笔"
-        onPress={() => {
-          haptics.trigger('button');
-          navigation.navigate('Write');
-        }}
-        style={({ pressed }) => [
-          styles.writePrompt,
-          isDark ? styles.writePromptDark : styles.writePromptLight,
-          {
-            borderColor: 'rgba(192,57,43,0.08)',
-            opacity: pressed ? 0.92 : 1,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          },
-        ]}
-      >
-        <GlowBackground />
-        <View style={[styles.promptSeal, { backgroundColor: colors.seal }]}>
-          <Text style={styles.promptSealText}>落</Text>
-        </View>
-        <View style={styles.promptText}>
-          <Text style={[styles.promptTitle, { color: colors.text }]}>
-            此刻<Text style={{ color: colors.accent }}>不落</Text>，就散了
-          </Text>
-          <Text style={[styles.promptHint, { color: colors.textMuted }]}>
-            记一笔 · 30秒
-          </Text>
-        </View>
-      </Pressable>
+      </Animated.View>
 
       {arrivedLetter ? (
         <ArrivedLetterNudge
           item={arrivedLetter}
           onOpen={() =>
-            navigation.navigate('Unseal', {
-              letterId: arrivedLetter.letter.id,
-              source: 'daily',
+            navigation.navigate('Letters', {
+              openArrivedLetterId: arrivedLetter.letter.id,
             })
           }
         />
@@ -414,7 +427,7 @@ export function DailyScreen() {
           memory={oldMemory}
           oldReason={getSimilarityReason(oldMemory.writtenAt, now)}
           variant="old"
-          onPress={() => openMemory(oldMemory)}
+          onPress={() => openMemory(oldMemory, '旧日回声')}
         />
       ) : null}
 
@@ -479,8 +492,12 @@ export function DailyScreen() {
         stickySectionHeadersEnabled={false}
       />
       <MemoryDetailModal
+        contextLabel={detailContext}
         memory={selectedMemory}
-        onDismiss={() => setSelectedMemory(null)}
+        onDismiss={() => {
+          setSelectedMemory(null);
+          setDetailContext(undefined);
+        }}
         onDeleted={() => load()}
       />
     </SafeAreaView>
@@ -545,54 +562,6 @@ const styles = StyleSheet.create({
   phenologyDetail: {
     marginTop: spacing.xxs,
     fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.caption,
-    letterSpacing: 0.3,
-  },
-  writePrompt: {
-    minHeight: 64,
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.greeting,
-    marginTop: spacing.gap,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.gap,
-    borderWidth: 0.5,
-    borderRadius: radius.paper,
-    overflow: 'hidden',
-  },
-  writePromptLight: {
-    backgroundColor: '#FBF4E8',
-  },
-  writePromptDark: {
-    backgroundColor: '#3A3028',
-  },
-  promptSeal: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 5,
-    boxShadow: '0 2px 6px rgba(192,57,43,0.2)',
-    transform: [{ rotate: '-4deg' }],
-  },
-  promptSealText: {
-    color: '#FFF8F0',
-    fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.body,
-    fontWeight: '500',
-    transform: [{ rotate: '4deg' }],
-  },
-  promptText: { flex: 1 },
-  promptTitle: {
-    fontFamily: fontFamilies.serif,
-    fontSize: 14,
-    lineHeight: 19.6,
-  },
-  promptHint: {
-    marginTop: spacing.xxs,
-    fontFamily: fontFamilies.sans,
     fontSize: fontSizes.caption,
     letterSpacing: 0.3,
   },

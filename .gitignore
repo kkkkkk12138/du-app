@@ -1,6 +1,9 @@
 # OSX
 #
 .DS_Store
+SingletonCookie
+SingletonLock
+SingletonSocket
 
 # Xcode
 #

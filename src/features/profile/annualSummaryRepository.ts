@@ -32,6 +32,7 @@ export async function getAnnualSummary(
       .query(
         Q.where('deleted', false),
         Q.where('is_future_letter', false),
+        Q.where('status', Q.notEq('draft')),
         Q.where('written_at', Q.gte(start.getTime())),
         Q.where('written_at', Q.lt(end.getTime())),
         Q.sortBy('written_at', Q.asc),

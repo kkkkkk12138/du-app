@@ -2,7 +2,9 @@ import {Letter, Memory} from '../src/db/models';
 import {
   classifyLetters,
   daysUntil,
+  filterLetterSections,
   getLetterProgress,
+  getOpenedLetterRuleCount,
   LetterWithMemory,
 } from '../src/features/letters/letterLogic';
 
@@ -91,4 +93,42 @@ test('clamps letter progress before departure and after arrival', () => {
   expect(getLetterProgress(letter, new Date(2026, 6, 31))).toBe(0);
   expect(getLetterProgress(letter, new Date(2026, 7, 2))).toBe(0.5);
   expect(getLetterProgress(letter, new Date(2026, 7, 4))).toBe(1);
+});
+
+test('filters mailbox sections without changing the classified source', () => {
+  const now = new Date(2026, 7, 2, 12);
+  const tomorrow = item({
+    id: 'tomorrow',
+    sentAt: new Date(2026, 7, 1),
+    arriveDate: new Date(2026, 7, 3, 18),
+  });
+  const later = item({
+    id: 'later',
+    sentAt: new Date(2026, 7, 1),
+    arriveDate: new Date(2026, 7, 8, 18),
+  });
+  const opened = item({
+    id: 'opened',
+    sentAt: new Date(2026, 6, 1),
+    arriveDate: new Date(2026, 7, 1),
+    status: 'opened',
+    openedAt: new Date(2026, 7, 1),
+  });
+  const sections = classifyLetters([tomorrow, later, opened], now);
+
+  expect(filterLetterSections(sections, 'tomorrow', now)).toEqual({
+    arriving: [],
+    traveling: [tomorrow],
+    opened: [],
+  });
+  expect(filterLetterSections(sections, 'opened', now).opened).toEqual([
+    opened,
+  ]);
+  expect(sections.traveling).toEqual([tomorrow, later]);
+});
+
+test('extends ruled letter paper to cover the full rendered body', () => {
+  expect(getOpenedLetterRuleCount(320)).toBe(24);
+  expect(getOpenedLetterRuleCount(768)).toBe(25);
+  expect(getOpenedLetterRuleCount(1600)).toBe(51);
 });
