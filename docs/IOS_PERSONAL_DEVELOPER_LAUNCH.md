@@ -2,19 +2,27 @@
 
 适用对象：个人开发者首次发布免费 iPhone App，后续再通过 App 内购买提供增值功能。
 
-更新日期：2026-08-05
+更新日期：2026-08-06
+
+第一次使用 GitHub 或应用商店时，先阅读：
+
+```text
+docs/PUBLISHING_MASTER_GUIDE.md
+```
 
 ## 先看当前状态
 
-代码已通过 35 个 Jest 测试套件、120 项测试、TypeScript、严格 ESLint，以及 `arm64 + x86_64` iOS Release Simulator 构建。模拟器构建不能替代真机归档和 App Store 上传。
+当前代码已完成 TypeScript、严格 ESLint、Jest 和 iOS Release Simulator 验证。发布前必须基于最终提交重新运行全部检查；模拟器构建不能替代真机归档、TestFlight 和 App Store 上传。
 
-目前仍有四项发布阻塞：
+目前仍有以下发布阻塞：
 
 1. Xcode 中的 Bundle ID 仍为 `org.reactjs.native.example.duapp`。
 2. `AppIcon.appiconset` 只有规格声明，没有正式图标文件。
 3. Xcode 尚未配置你的 Apple Developer Team 和 App Store 签名。
+4. 隐私政策、服务条款和支持页面尚未提供最终公开 HTTPS URL。
+5. 尚未完成真机和 TestFlight 最终验收。
 
-完成这三项前，不要上传构建版本。
+完成这些事项前，不要提交正式审核。
 
 ## 1. 准备账户和资料
 
@@ -142,15 +150,22 @@ App Store Connect 要求所有 App 提供公开可访问的隐私政策 URL。�
 - `docs/app-store/TERMS_OF_SERVICE.md`
 - `docs/app-store/SUPPORT.md`
 
-### 使用 GitHub Pages
+### 低成本发布方式
+
+当前源码仓库是私有仓库。GitHub Free 只能从公开仓库使用 GitHub Pages；从私有仓库使用 Pages 需要 GitHub Pro、Team 或 Enterprise。不要为了发布政策页面把整个源码仓库改成公开。
+
+建议单独建立一个公开仓库，例如 `du-legal`，只放隐私政策、服务条款和支持页面：
 
 1. 先把模板中的 `[待填写]` 全部替换为真实信息。
-2. 在 GitHub 仓库打开 `Settings > Pages`。
-3. Source 选择 `Deploy from a branch`。
-4. Branch 选择主分支，目录选择 `/docs`。
-5. 保存并等待部署完成。
-6. 在无登录状态的浏览器中打开三个页面。
-7. 把最终 HTTPS URL 记录到 `APP_STORE_METADATA.md`。
+2. 只复制三个公开文档，不复制应用源码、内部路线图、密钥或用户数据。
+3. 在公开政策仓库打开 `Settings > Pages`。
+4. 选择 `Deploy from a branch`。
+5. 选择发布分支和目录。
+6. 保存并等待部署完成。
+7. 在退出 GitHub 登录的浏览器中打开三个页面。
+8. 把最终 HTTPS URL 记录到 `APP_STORE_METADATA.md`。
+
+若计划进入中国大陆商店或提供账号同步，优先使用本人长期控制的域名和合规托管方案。
 
 政策必须说明：
 

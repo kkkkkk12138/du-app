@@ -4,6 +4,8 @@
 
 当前发布优先级为 iOS，其次为 Android。两个平台共用业务与数据层，平台密钥和商店凭据只保存在发布机器。
 
+第一次接触 GitHub 或应用商店时，先阅读 [GitHub 与应用商店发布总指导书](docs/PUBLISHING_MASTER_GUIDE.md)。其中说明当前账号、仓库和分支状态，以及源码、凭据、安装包和商店资料分别应提交到哪里。
+
 ## 当前能力
 
 - 日迹、信件、未来信、念想与副本
@@ -78,15 +80,19 @@ Google Play 资料草稿见 [商店资料模板](docs/google-play/PLAY_STORE_MET
 
 ## 数据与安全
 
-- 数据库 schema 当前为 v13。
+- 数据库 schema 当前为 v14。
 - 完整备份使用 `.du-backup.json`，附件带 SHA-256 校验。
 - 恢复前会生成救援备份，失败时自动回滚。
 - 不要提交 `.env`、`.p8`、`.p12`、`.cer`、`.mobileprovision` 或生产签名文件。
 
 ## 当前验证
 
-- Jest：35 个测试套件，120 项测试通过
-- TypeScript：通过
-- 严格 ESLint：通过
-- iOS Release Simulator：`arm64 + x86_64` 构建通过
-- Android Release AAB：API 36、四架构签名构建通过
+提交发布版本前必须重新运行以下验证，不能依赖文档中的历史测试数量：
+
+```sh
+npm test -- --runInBand
+npx tsc --noEmit
+npx eslint . --max-warnings=0
+```
+
+还必须重新生成 iOS Release Archive 和 Android Release AAB，并在真实设备或商店测试渠道复验最终构建。
