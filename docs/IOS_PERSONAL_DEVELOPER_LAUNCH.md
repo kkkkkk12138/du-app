@@ -13,9 +13,8 @@
 1. Xcode 中的 Bundle ID 仍为 `org.reactjs.native.example.duapp`。
 2. `AppIcon.appiconset` 只有规格声明，没有正式图标文件。
 3. Xcode 尚未配置你的 Apple Developer Team 和 App Store 签名。
-4. `GoogleService-Info.plist` 不在仓库中，需要从 Firebase 下载后仅保存在本机。
 
-完成这四项前，不要上传构建版本。
+完成这三项前，不要上传构建版本。
 
 ## 1. 准备账户和资料
 
@@ -45,7 +44,7 @@
 | 支持邮箱         | `[填写长期邮箱]`    |
 | 是否首发中国大陆 | `[是 / 否]`         |
 
-Bundle ID 与 App、Keychain、通知、Firebase、内购和后续升级绑定。正式创建后不要更换。
+Bundle ID 与 App、Keychain、通知、内购和后续升级绑定。正式创建后不要更换。
 
 ## 2. 把源码安全保存到 GitHub
 
@@ -63,7 +62,7 @@ GitHub 用来保存源码和文档，不用来保存签名凭据或生产配置�
 ### 不应上传
 
 - `node_modules/`、`ios/Pods/`、DerivedData、Archive 和 `.ipa`
-- `.env`、`GoogleService-Info.plist`
+- `.env`
 - `.p8`、`.p12`、`.cer`、`.mobileprovision`
 - App Store Connect API 私钥
 - 浏览器或模拟器临时文件
@@ -135,21 +134,7 @@ open duapp.xcworkspace
 
 预期结果：Asset Catalog 不再显示 AppIcon 缺失警告。
 
-## 6. 配置 Firebase Crashlytics
-
-App 集成了 Firebase Crashlytics。隐私说明和 App Store 隐私申报必须与实际启用状态一致。
-
-1. 打开 <https://console.firebase.google.com/>。
-2. 创建或选择 Firebase 项目。
-3. 添加 iOS App，Bundle ID 必须与 Xcode 完全相同。
-4. 下载 `GoogleService-Info.plist`。
-5. 在 Xcode 中把文件拖入 `duapp` target，勾选 `Copy items if needed` 和 `duapp` target。
-6. 不要把该文件提交到 GitHub；仓库的 `.gitignore` 已排除它。
-7. 在真机 Release 或 TestFlight 中制造一条受控的非生产崩溃测试，确认 Crashlytics 后台收到事件后再删除测试入口。
-
-若首版决定完全不用 Crashlytics，应删除 SDK 和初始化代码，再同步修改隐私政策与 App Privacy，不能只删除配置文件。
-
-## 7. 发布隐私政策、服务条款和支持页面
+## 6. 发布隐私政策、服务条款和支持页面
 
 App Store Connect 要求所有 App 提供公开可访问的隐私政策 URL。仓库已提供：
 
@@ -173,11 +158,11 @@ App Store Connect 要求所有 App 提供公开可访问的隐私政策 URL。�
 - 当前没有账号同步。
 - 卸载或清除 App 数据可能造成内容丢失。
 - 用户可以主动导出和恢复完整备份。
-- Crashlytics 处理崩溃堆栈、设备、系统和 App 版本等诊断数据。
+- 当前版本不包含第三方崩溃采集或分析 SDK。
 - 相机、相册、麦克风、位置、通知和生物识别的用途。
 - 联系邮箱和生效日期。
 
-## 8. 决定是否首发中国大陆
+## 7. 决定是否首发中国大陆
 
 若首发包含中国大陆，需要按适用流程完成 APP 备案。材料和办理入口会随接入服务商、地区及政策变化，提交前以工信部和接入服务商当时要求为准。
 
@@ -189,7 +174,7 @@ App Store Connect 要求所有 App 提供公开可访问的隐私政策 URL。�
 
 不要在未完成备案时把中国大陆列为首发地区。
 
-## 9. 创建 App Store Connect 记录
+## 8. 创建 App Store Connect 记录
 
 Apple 要求先创建 App 记录，再上传构建版本。
 
@@ -208,7 +193,7 @@ Apple 要求先创建 App 记录，再上传构建版本。
 
 Apple 官方操作页：<https://developer.apple.com/cn/help/app-store-connect/create-an-app-record/add-a-new-app>
 
-## 10. 填写 App Store 页面
+## 9. 填写 App Store 页面
 
 打开 `docs/app-store/APP_STORE_METADATA.md`，逐项填写到 App Store Connect。
 
@@ -229,14 +214,13 @@ Apple 官方操作页：<https://developer.apple.com/cn/help/app-store-connect/c
 先按实际 SDK 和数据流逐项回答，不要因为数据主要保存在本地就把所有问题都选“否”。
 
 - 用户日记正文和附件：当前默认只在本机处理，不上传给开发者。
-- Crashlytics：按 Firebase 实际收集的诊断数据申报。
 - 位置：仅在用户主动添加地点时使用；是否构成“收集”取决于数据是否离开设备。
-- 标识符、使用数据和诊断：以 Firebase 控制台、SDK 文档和实际配置为准。
+- 标识符、使用数据和诊断：当前版本不通过第三方 SDK 收集；以最终构建和实际网络请求为准。
 - Tracking：当前产品不应使用广告追踪；若后台或 SDK 配置不一致，先修代码再填写问卷。
 
 Apple 官方 App Privacy 说明：<https://developer.apple.com/cn/help/app-store-connect/reference/app-information/app-privacy>
 
-## 11. 准备 App Store 截图
+## 10. 准备 App Store 截图
 
 Apple 当前要求每组上传 1 到 10 张 JPG 或 PNG 截图。iPhone 6.9 英寸截图可使用 Apple 列出的有效尺寸，例如 1320 × 2868、1290 × 2796 或 1260 × 2736 像素。
 
@@ -259,7 +243,7 @@ Apple 当前要求每组上传 1 到 10 张 JPG 或 PNG 截图。iPhone 6.9 英�
 
 Apple 官方尺寸页：<https://developer.apple.com/cn/help/app-store-connect/reference/screenshot-specifications>
 
-## 12. 真机发布验收
+## 11. 真机发布验收
 
 必须使用真机测试，模拟器不能验证相机、麦克风、生物识别和完整权限行为。
 
@@ -281,7 +265,7 @@ Apple 官方尺寸页：<https://developer.apple.com/cn/help/app-store-connect/r
 
 发现崩溃、数据丢失、无法返回、权限死循环或备份不能恢复时，不要上传审核版本。
 
-## 13. 生成 Archive
+## 12. 生成 Archive
 
 1. 在 Xcode 打开 `duapp.xcworkspace`。
 2. 选择 `Any iOS Device (arm64)` 或连接的真机，不要选择模拟器。
@@ -294,7 +278,7 @@ Apple 官方尺寸页：<https://developer.apple.com/cn/help/app-store-connect/r
 
 每次重新上传必须增加 Build，例如从 `1` 改为 `2`。同一版本号可以对应多个不同 Build。
 
-## 14. 上传到 App Store Connect
+## 13. 上传到 App Store Connect
 
 1. 在 Organizer 选择通过验证的 Archive。
 2. 点击 `Distribute App`。
@@ -308,7 +292,7 @@ Apple 官方尺寸页：<https://developer.apple.com/cn/help/app-store-connect/r
 
 Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connect/manage-builds/upload-builds>
 
-## 15. 用 TestFlight 验证
+## 14. 用 TestFlight 验证
 
 1. 在 App Store Connect 打开 `TestFlight`。
 2. 等待构建状态变为可测试。
@@ -321,7 +305,7 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 
 预期结果：从 TestFlight 安装的 Release 构建可完成核心流程，没有依赖 Metro。
 
-## 16. 填写审核信息
+## 15. 填写审核信息
 
 当前 App 无需登录，审核说明可使用 `APP_STORE_METADATA.md` 中的草稿。
 
@@ -337,7 +321,7 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 
 不要写入你的 Apple Account 密码、证书密码或其他敏感凭据。
 
-## 17. 提交审核
+## 16. 提交审核
 
 1. 在 App Store 版本页面选择已上传并通过 TestFlight 验证的 Build。
 2. 补齐红色提示的所有字段。
@@ -350,7 +334,7 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 
 审核通过后先不要立即发布。再次核对商店文案、截图、价格、地区和隐私 URL，再手动发布。
 
-## 18. 常见失败处理
+## 17. 常见失败处理
 
 ### Xcode 提示 Signing requires a development team
 
@@ -358,7 +342,7 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 
 ### Bundle ID 无法注册或上传后找不到 App
 
-核对 Xcode、Developer Portal、Firebase 和 App Store Connect 中的 Bundle ID，四处必须完全一致。
+核对 Xcode、Developer Portal 和 App Store Connect 中的 Bundle ID，三处必须完全一致。
 
 ### AppIcon 缺失
 
@@ -374,13 +358,13 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 
 ### 隐私问卷不知道怎么选
 
-暂停提交，核对 `LegalDocumentScreen.tsx`、Firebase 配置和 SDK 数据说明。不能猜测，也不能把未知项全部选“未收集”。
+暂停提交，核对 `LegalDocumentScreen.tsx`、最终依赖和真机网络请求。不能猜测，也不能把未知项全部选“未收集”。
 
 ### 审核指出元数据与功能不一致
 
 修改截图、描述或审核说明，使其只描述当前构建真实存在的功能。不要用未来规划解释当前版本。
 
-## 19. 后续加入内购
+## 18. 后续加入内购
 
 首版保持免费下载。准备收费版本时：
 
@@ -393,7 +377,7 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 
 不要在代码中出现尚未完成的付费按钮或虚假价格。
 
-## 20. 你需要提供给开发侧的信息
+## 19. 你需要提供给开发侧的信息
 
 在下一轮发布配置中提供：
 
@@ -405,5 +389,4 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 6. 隐私政策、服务条款和支持页面 URL。
 7. 是否首发中国大陆。
 8. App Store 名称和备用名称。
-9. Firebase iOS App 是否继续使用。
-10. 用于真机和 TestFlight 的 Apple Account 邮箱。
+9. 用于真机和 TestFlight 的 Apple Account 邮箱。

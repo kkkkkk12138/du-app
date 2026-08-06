@@ -46,13 +46,12 @@ npx eslint . --max-warnings=0
 
 ## 发布前必填
 
-仓库不会包含证书、描述文件、App Store Connect API 密钥、Firebase 配置或其他私密凭据。首次归档前需要在本机补充：
+仓库不会包含证书、描述文件、App Store Connect API 密钥或其他私密凭据。首次归档前需要在本机补充：
 
 1. 将示例 Bundle ID 改为正式且长期不变的 Bundle ID。
 2. 在 Xcode 中选择有效的 Apple Developer Team。
 3. 补齐 `AppIcon.appiconset` 的正式图标文件。
-4. 从 Firebase 下载 `GoogleService-Info.plist` 并放到 iOS 工程中；该文件已被 `.gitignore` 排除。
-5. 将公开隐私政策、服务条款和支持页面 URL 填入 App Store Connect。
+4. 将公开隐私政策、服务条款和支持页面 URL 填入 App Store Connect。
 
 逐步操作见 [iOS App Store 上架指导书](docs/IOS_PERSONAL_DEVELOPER_LAUNCH.md)。
 
@@ -82,7 +81,7 @@ Google Play 资料草稿见 [商店资料模板](docs/google-play/PLAY_STORE_MET
 - 数据库 schema 当前为 v13。
 - 完整备份使用 `.du-backup.json`，附件带 SHA-256 校验。
 - 恢复前会生成救援备份，失败时自动回滚。
-- 不要提交 `.env`、`GoogleService-Info.plist`、`.p8`、`.p12`、`.cer`、`.mobileprovision` 或生产签名文件。
+- 不要提交 `.env`、`.p8`、`.p12`、`.cer`、`.mobileprovision` 或生产签名文件。
 
 ## 当前验证
 

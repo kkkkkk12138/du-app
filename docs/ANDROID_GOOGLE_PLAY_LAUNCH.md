@@ -19,8 +19,7 @@
 1. 永久 `applicationId`。当前值为 `com.duapp`，发布后不能更换。
 2. 正式应用图标、功能图片和商店截图。
 3. 支持邮箱、隐私政策 HTTPS URL 和服务条款 URL。
-4. 是否接入 Firebase Crashlytics；接入时需提供本机 `google-services.json`。
-5. 首发国家或地区，以及是否进入中国大陆的第三方安卓商店。
+4. 首发国家或地区，以及是否进入中国大陆的第三方安卓商店。
 
 ## 保护上传密钥
 
@@ -198,7 +197,7 @@ docs/app-store/PRIVACY_POLICY.md
 - 用户文字、照片、录音、手书、地点和备份默认只在设备本地处理。
 - 系统权限只在用户主动使用相关功能时请求。
 - 当前没有账号系统、广告 SDK 或跨设备云同步。
-- 若启用 Firebase Crashlytics，崩溃信息和设备诊断数据可能发送给 Firebase，问卷必须同步申报。
+- 当前版本不包含第三方崩溃采集或分析 SDK。
 
 逐字段草稿见：
 
@@ -206,7 +205,7 @@ docs/app-store/PRIVACY_POLICY.md
 docs/google-play/DATA_SAFETY.md
 ```
 
-不要在没有核对最终依赖和网络请求前直接提交问卷。启用或移除 Firebase、分析、广告、登录或云同步后，都要重新检查数据安全声明。
+不要在没有核对最终依赖和网络请求前直接提交问卷。增加分析、广告、登录、诊断或云同步后，都要重新检查数据安全声明。
 
 ## 准备商店资料
 
@@ -308,18 +307,11 @@ docs/google-play/PLAY_STORE_METADATA.md
 sdk.dir=/Users/bytedance/Library/Android/sdk
 ```
 
-### Firebase 初始化失败
-
-现象：Release 启动时 Firebase 报缺少应用配置。
-
-处理：在 Firebase 创建与正式 `applicationId` 一致的 Android 应用，下载 `google-services.json` 到 `android/app/`，并核对数据安全声明。若首版不使用 Firebase，应禁用依赖 Firebase 的运行时代码，而不是提交空配置。
-
 ## 不应上传到 GitHub 的文件
 
 ```text
 android/keystore.properties
 android/local.properties
-android/app/google-services.json
 *.jks
 *.keystore
 ```

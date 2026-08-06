@@ -91,6 +91,14 @@ ios/GoogleService-Info.plist
 # testing
 /coverage
 
+# Local design review and session artifacts
+/exports/
+/docs/SESSION_HANDOFF.md
+/docs/PROTOTYPE_INTERACTION_DIFF.md
+/docs/PROTOTYPE_PARSING_REPORT.md
+/docs/implementation-screenshots/
+/docs/prototype-screenshots/
+
 # Yarn
 .yarn/*
 !.yarn/patches

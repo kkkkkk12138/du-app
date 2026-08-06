@@ -1,6 +1,6 @@
 # 渡 Google Play 数据安全填写草稿
 
-这份草稿依据当前本地优先实现编写。提交 Play Console 前必须用最终 Release 包、依赖清单和实际网络请求复核，尤其要确认 Firebase Crashlytics 是否启用。
+这份草稿依据当前本地优先实现编写。提交 Play Console 前必须用最终 Release 包、依赖清单和实际网络请求复核。
 
 ## 当前数据边界
 
@@ -23,11 +23,9 @@
 
 若最终 Release 没有向开发者或第三方服务器发送用户数据，可选择“不收集或分享”。系统权限、本机处理和用户主动导出到自己选择的位置，通常不等于开发者收集数据。
 
-若启用 Firebase Crashlytics，需要根据 Firebase 当时的文档申报诊断信息、应用互动或设备标识符等实际字段，并把答案改为“收集数据”。
-
 ### 数据是否在传输过程中加密
 
-当前核心数据不上传服务器。若启用 Firebase，其网络传输应按实际 SDK 行为和 Firebase 文档回答。
+当前核心数据不上传服务器，当前版本也不包含第三方崩溃采集或分析 SDK。
 
 ### 是否提供数据删除请求机制
 
@@ -48,24 +46,6 @@
 
 应用不声明读取整个相册的权限，也不声明旧版外部存储读写权限。
 
-## Firebase 分支
-
-### 不启用 Firebase
-
-1. 确认 Release 启动和主要流程不调用 Crashlytics。
-2. 不向 `android/app/` 添加 `google-services.json`。
-3. 用代理或设备网络日志验证没有 Firebase 请求。
-4. 按纯本地应用填写数据安全问卷。
-
-### 启用 Firebase Crashlytics
-
-1. 在 Firebase 控制台创建与正式 `applicationId` 完全一致的 Android 应用。
-2. 下载 `google-services.json` 到 `android/app/`，不要提交 GitHub。
-3. 配置 Google Services 和 Crashlytics Gradle 插件。
-4. 构建 Release 并触发一次受控测试崩溃。
-5. 确认 Firebase 控制台收到报告。
-6. 在隐私政策和 Play 数据安全中申报实际诊断数据。
-
 ## 发布前复核
 
-逐项检查最终 `AndroidManifest.xml`、Gradle 依赖、Firebase 配置和真机网络请求。新增登录、同步、分析、广告、客服 SDK、推送服务或云存储后，这份草稿必须重写相应部分。
+逐项检查最终 `AndroidManifest.xml`、Gradle 依赖和真机网络请求。新增登录、同步、诊断、分析、广告、客服 SDK、推送服务或云存储后，这份草稿必须重写相应部分。

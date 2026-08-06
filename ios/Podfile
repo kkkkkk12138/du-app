@@ -26,7 +26,6 @@ target 'duapp' do
   config = use_native_modules!
 
   use_frameworks! :linkage => :static
-  $RNFirebaseAsStaticFramework = true
 
   # WatermelonDB 的 iOS Pod 依赖 npm 包内置的 simdjson。
   pod 'simdjson', :path => '../node_modules/@nozbe/simdjson'
