@@ -2,6 +2,11 @@ import {Q} from '@nozbe/watermelondb';
 
 import {database} from './database';
 import {Memory} from './models';
+import {getPlaceCity, resolvePlaceId} from './placeRepository';
+import {
+  recognizeCity,
+  type RecognizedCity,
+} from '../services/placeRecognition';
 import {
   finalizePreparedMedia,
   prepareMediaForPersistence,
@@ -16,6 +21,7 @@ export type CreateMemoryInput = {
   writtenAt?: Date;
   placeId?: string;
   placeDetail?: string;
+  placeCity?: RecognizedCity;
   customTags?: string[];
   imagePath?: string;
   audioPath?: string;
@@ -44,14 +50,25 @@ export async function createMemory(input: CreateMemoryInput) {
         draft = undefined;
       }
     }
+    const now = Date.now();
+    const writtenAt = input.writtenAt ?? new Date(now);
+    const placeCity =
+      input.placeCity ?? recognizeCity(input.placeDetail);
+    const placeId =
+      input.placeId ??
+      (await resolvePlaceId(input.placeDetail, writtenAt, placeCity));
+    const storedPlaceCity = await getPlaceCity(placeId);
+    const resolvedPlaceCity = storedPlaceCity ?? placeCity;
     const memory = await database.write(async () => {
-      const now = Date.now();
       const apply = (record: Memory) => {
         record.type = input.type ?? 'text';
         record.content = input.content;
         record.status = 'published';
-        record.placeId = input.placeId;
+        record.placeId = placeId;
         record.placeDetail = input.placeDetail;
+        record.placeCity = resolvedPlaceCity?.name;
+        record.placeRegion = resolvedPlaceCity?.region;
+        record.placeCountryCode = resolvedPlaceCity?.countryCode;
         record.imagePath = prepared[0].path;
         record.audioPath = prepared[1].path;
         record.audioDuration = input.audioDuration;
@@ -59,7 +76,7 @@ export async function createMemory(input: CreateMemoryInput) {
         record.bodyTags = '[]';
         record.heartTags = '[]';
         record.customTags = JSON.stringify(input.customTags ?? []);
-        record.writtenAt = input.writtenAt ?? new Date(now);
+        record.writtenAt = writtenAt;
         record.updatedAt = new Date(now);
         record.isFutureLetter = false;
         record.futureArriveAt = undefined;

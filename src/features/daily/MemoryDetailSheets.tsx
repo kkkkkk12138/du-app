@@ -4,10 +4,10 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 
 import { Letter } from '../../db/models';
 import { radius } from '../../tokens/radius';

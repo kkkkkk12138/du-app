@@ -28,6 +28,10 @@ jest.mock('../src/db/database', () => ({
       })),
       create: jest.fn(async (initialize: (record: any) => void) => {
         const record: any = { _raw: {} };
+        record.update = jest.fn(async (change: (value: any) => void) => {
+          change(record);
+          return record;
+        });
         initialize(record);
         record.id = record._raw.id;
         mockCollections[table].push(record);
@@ -104,4 +108,64 @@ test('seeds a complete, clearly identified and deletable example set once', asyn
 test('recognizes legacy development seeds as examples too', () => {
   expect(isExampleRecord('seed-v3-photo-today')).toBe(true);
   expect(isExampleRecord('user-memory-1')).toBe(false);
+});
+
+test('adds richer v5 examples once without recreating the v4 set', async () => {
+  mockInstalledVersion = 4;
+
+  await expect(
+    seedProductExamples('user-1', new Date(2026, 7, 6, 9, 0)),
+  ).resolves.toBe(true);
+
+  expect(mockCollections.memories).toHaveLength(4);
+  expect(mockCollections.letters).toHaveLength(2);
+  expect(mockCollections.wishes).toHaveLength(2);
+  expect(mockCollections.places).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: 'example-place-harbin',
+        name: '哈尔滨',
+      }),
+    ]),
+  );
+  await expect(
+    seedProductExamples('user-1', new Date(2026, 7, 6, 9, 0)),
+  ).resolves.toBe(false);
+});
+
+test('updates surviving v5 copy without restoring deleted examples', async () => {
+  mockInstalledVersion = 5;
+  const rainMemory: any = {
+    id: 'example-memory-rain-walk',
+    content: '旧的偏沉重文案',
+    updatedAt: new Date(2026, 6, 1),
+  };
+  rainMemory.update = jest.fn(async (change: (record: any) => void) => {
+    change(rainMemory);
+    return rainMemory;
+  });
+  const userMemory = {
+    id: 'user-memory-1',
+    content: '用户自己的记录',
+    update: jest.fn(),
+  };
+  mockCollections.memories.push(rainMemory, userMemory);
+
+  const now = new Date(2026, 7, 6, 10, 0);
+  await expect(seedProductExamples('user-1', now)).resolves.toBe(true);
+
+  expect(mockInstalledVersion).toBe(6);
+  expect(mockCollections.memories).toHaveLength(2);
+  expect(rainMemory.content).toContain('三只鸭子');
+  expect(rainMemory.updatedAt).toEqual(now);
+  expect(rainMemory.update).toHaveBeenCalledTimes(1);
+  expect(userMemory.content).toBe('用户自己的记录');
+  expect(userMemory.update).not.toHaveBeenCalled();
+  expect(
+    mockCollections.memories.find(
+      memory => memory.id === 'example-memory-harbin-snow',
+    ),
+  ).toBeUndefined();
+  expect(mockCollections.letters).toHaveLength(0);
+  expect(mockCollections.wishes).toHaveLength(0);
 });

@@ -2,6 +2,7 @@ import {Q} from '@nozbe/watermelondb';
 
 import {database} from '../../db/database';
 import {Memory} from '../../db/models';
+import type {RecognizedCity} from '../../services/placeRecognition';
 import type {ArrivalPreset} from '../newLetter/futureLetterLogic';
 
 export type WriteDraftInput = {
@@ -15,6 +16,7 @@ export type WriteDraftInput = {
   audioDuration?: number;
   inkImagePath?: string;
   placeDetail?: string;
+  placeCity?: RecognizedCity;
 };
 
 export type WriteDraftSnapshot = WriteDraftInput & {
@@ -56,6 +58,14 @@ function toSnapshot(memory: Memory): WriteDraftSnapshot {
     audioDuration: memory.audioDuration,
     inkImagePath: memory.inkImagePath,
     placeDetail: memory.placeDetail,
+    placeCity: memory.placeCity
+      ? {
+          name: memory.placeCity,
+          pinyin: '',
+          region: memory.placeRegion,
+          countryCode: memory.placeCountryCode,
+        }
+      : undefined,
     updatedAt: memory.updatedAt,
   };
 }
@@ -121,6 +131,9 @@ export async function saveWriteDraft(
     record.audioDuration = input.audioDuration;
     record.inkImagePath = input.inkImagePath;
     record.placeDetail = input.placeDetail;
+    record.placeCity = input.placeCity?.name;
+    record.placeRegion = input.placeCity?.region;
+    record.placeCountryCode = input.placeCity?.countryCode;
     record.bodyTags = '[]';
     record.heartTags = '[]';
     record.customTags = JSON.stringify(input.customTags);

@@ -14,7 +14,7 @@ import {
 } from './dataExport';
 import { removeMediaFile, writeRestoredMediaFile } from './mediaStorage';
 
-const currentSchemaVersion = 13;
+const currentSchemaVersion = 14;
 const maximumBackupBytes = 300 * 1024 * 1024;
 const maximumRecords = 100000;
 const maximumAssets = 5000;
@@ -109,7 +109,9 @@ async function readAndValidateBackup(path: string): Promise<PreparedBackup> {
     !isObject(parsed) ||
     parsed.format !== 'du-local-backup' ||
     parsed.version !== 1 ||
-    ![11, 12, currentSchemaVersion].includes(Number(parsed.schemaVersion)) ||
+    ![11, 12, 13, currentSchemaVersion].includes(
+      Number(parsed.schemaVersion),
+    ) ||
     !isObject(parsed.tables) ||
     !Array.isArray(parsed.assets) ||
     typeof parsed.exportedAt !== 'string'
@@ -124,6 +126,17 @@ async function readAndValidateBackup(path: string): Promise<PreparedBackup> {
   parsedTables.books ??= [];
   parsedTables.book_pages ??= [];
   parsedTables.scraps ??= [];
+  if (Number(parsed.schemaVersion) < 14) {
+    (parsedTables.memories as BackupRawRecord[]).forEach(record => {
+      record.place_city ??= null;
+      record.place_region ??= null;
+      record.place_country_code ??= null;
+    });
+    (parsedTables.places as BackupRawRecord[]).forEach(record => {
+      record.region ??= null;
+      record.country_code ??= null;
+    });
+  }
   backupTables.forEach(table => validateRawRecords(table, parsedTables[table]));
   const recordCount = backupTables.reduce(
     (count, table) => count + (parsedTables[table] as unknown[]).length,

@@ -18,15 +18,30 @@ import {
 const productExamplesSeededKey = localStorageKey<number>(
   'product_examples_seeded',
 );
-const productExamplesVersion = 4;
+const productExamplesVersion = 6;
 
 export const productExampleManifest = {
-  memories: 6,
-  letters: 4,
-  wishes: 3,
+  memories: 10,
+  letters: 6,
+  wishes: 5,
   quests: 3,
   books: 3,
   scraps: 12,
+} as const;
+
+const versionSixMemoryCopy = {
+  'example-memory-harbin-snow':
+    '中央大街的雪被脚步压得发亮。面包房刚出炉一盘红肠面包，我买了两个，走到路口已经吃掉一个。',
+  'example-memory-kitchen-light':
+    '夜里去厨房找水喝，发现冰箱门没关严，一直很小声地滴滴响。顺手切了半个苹果，另外半个留给明早。',
+  'example-memory-rain-walk':
+    '雨停在傍晚六点十七分。便利店门口的伞一把把合起来，叶尖还挂着水。沿河走了十分钟，看见三只鸭子排成一列钻过桥洞。',
+  'example-memory-quiet-morning':
+    '清晨醒得很早。烧水的时候烤了两片面包，一片边缘有点焦。楼下第一辆公交车经过时，水刚好沸腾。',
+  'example-memory-letter-arrived':
+    '展信安。\n\n写下这封信时，窗外刚下过雨。你现在还常吃那家店的葱油拌面吗？阳台上的薄荷如果还活着，记得替从前的我夸它一句。\n\n最近若有好吃的小店，也请记在回信里。',
+  'example-memory-letter-traveling':
+    '等这封信到达时，春天应该已经站稳了。希望你去公园看过新叶，也试过那双买来一直没穿的黄色袜子。',
 } as const;
 
 const literaryBookSeeds = [
@@ -296,6 +311,174 @@ function applyMemorySeed(record: Memory, seed: MemorySeed, now: Date) {
   record.deleted = seed.deleted ?? false;
 }
 
+async function seedVersionFiveExamples(userId: string, now: Date) {
+  const [memories, letters, wishes, places] = await Promise.all([
+    database.get<Memory>('memories').query().fetch(),
+    database.get<Letter>('letters').query().fetch(),
+    database.get<Wish>('wishes').query().fetch(),
+    database.get<Place>('places').query().fetch(),
+  ]);
+  const memoryIds = new Set(memories.map(record => record.id));
+  const letterIds = new Set(letters.map(record => record.id));
+  const wishIds = new Set(wishes.map(record => record.id));
+  const placeIds = new Set(places.map(record => record.id));
+  const newMemorySeeds: MemorySeed[] = [
+    {
+      id: 'example-memory-harbin-snow',
+      type: 'text',
+      content: versionSixMemoryCopy['example-memory-harbin-snow'],
+      placeId: 'example-place-harbin',
+      placeDetail: '哈尔滨 · 中央大街',
+      tags: ['雪', '散步', '北方'],
+      mood: 'calm',
+      writtenAt: relativeDate(now, -4, 17, 26),
+    },
+    {
+      id: 'example-memory-kitchen-light',
+      type: 'text',
+      content: versionSixMemoryCopy['example-memory-kitchen-light'],
+      placeDetail: '家里的厨房',
+      tags: ['夜晚', '一盏灯', '慢下来'],
+      mood: 'soft',
+      writtenAt: relativeDate(now, -2, 22, 8),
+    },
+    {
+      id: 'example-memory-letter-summer',
+      type: 'text',
+      content:
+        '写给盛夏的你：如果窗外的蝉很吵，就把手机放远一点。去买一只桃子，坐在风能吹到的地方，允许今天只完成今天。',
+      placeDetail: '午后的书桌',
+      tags: ['未来信', '盛夏', '休息'],
+      mood: 'warm',
+      writtenAt: relativeDate(now, -20, 15, 12),
+      isFutureLetter: true,
+      futureArriveAt: relativeDate(now, 90, 9, 0),
+      futureArriveType: 'custom',
+      letterId: 'example-letter-summer',
+    },
+    {
+      id: 'example-memory-letter-birthday',
+      type: 'text',
+      content:
+        '生日快乐。希望这一年你没有只记得完成了什么，也记得哪一顿饭很好吃，哪一场雨让你临时改变了方向。',
+      placeDetail: '窗台边',
+      tags: ['未来信', '生日', '小事'],
+      mood: 'warm',
+      writtenAt: relativeDate(now, -45, 20, 30),
+      isFutureLetter: true,
+      futureArriveAt: relativeDate(now, 180, 8, 30),
+      futureArriveType: 'custom',
+      letterId: 'example-letter-birthday',
+    },
+  ];
+
+  await database.write(async () => {
+    if (!placeIds.has('example-place-harbin')) {
+      await database.get<Place>('places').create(place => {
+        place._raw.id = 'example-place-harbin';
+        place.name = '哈尔滨';
+        place.chChar = '哈';
+        place.pinyin = 'HAERBIN';
+        place.colorHex = '#8D9AAE';
+        place.type = 'visited';
+        place.firstVisit = relativeDate(now, -4, 17, 26);
+        place.lastVisit = relativeDate(now, -4, 17, 26);
+        place.visitCount = 1;
+        place.sortOrder = 2;
+        place.region = '黑龙江';
+        place.countryCode = 'CN';
+      });
+    }
+    for (const seed of newMemorySeeds) {
+      if (!memoryIds.has(seed.id)) {
+        await database.get<Memory>('memories').create(record => {
+          applyMemorySeed(record, seed, now);
+          if (seed.id === 'example-memory-harbin-snow') {
+            record.placeCity = '哈尔滨';
+            record.placeRegion = '黑龙江';
+            record.placeCountryCode = 'CN';
+          }
+        });
+      }
+    }
+    const letterSeeds = [
+      {
+        id: 'example-letter-summer',
+        memoryId: 'example-memory-letter-summer',
+        arriveDate: relativeDate(now, 90, 9, 0),
+        toName: '盛夏的我',
+      },
+      {
+        id: 'example-letter-birthday',
+        memoryId: 'example-memory-letter-birthday',
+        arriveDate: relativeDate(now, 180, 8, 30),
+        toName: '生日那天的我',
+      },
+    ];
+    for (const seed of letterSeeds) {
+      if (!letterIds.has(seed.id)) {
+        await database.get<Letter>('letters').create(record => {
+          record._raw.id = seed.id;
+          record.memoryId = seed.memoryId;
+          record.sentAt = now;
+          record.arriveDate = seed.arriveDate;
+          record.arriveType = 'custom';
+          record.toType = 'future_self';
+          record.toName = seed.toName;
+          record.status = 'traveling';
+        });
+      }
+    }
+    const wishSeeds = [
+      {
+        id: 'example-wish-night-walk',
+        title: '在陌生城市散步到天黑',
+        note: '不赶景点，只记住一家亮灯的小店和一条愿意再走一次的路。',
+        color: 'blue',
+      },
+      {
+        id: 'example-wish-family-recipe',
+        title: '学会一道家里的菜',
+        note: '把“适量”和“差不多”问清楚，也把做菜时说起的旧事记下来。',
+        color: 'pink',
+      },
+    ];
+    for (const [index, seed] of wishSeeds.entries()) {
+      if (!wishIds.has(seed.id)) {
+        await database.get<Wish>('wishes').create(record => {
+          record._raw.id = seed.id;
+          record.userId = userId;
+          record.title = seed.title;
+          record.note = seed.note;
+          record.color = seed.color;
+          record.category = 'life';
+          record.status = 'open';
+          record.pinned = false;
+          record.createdAt = relativeDate(now, -3 + index, 10, 0);
+          record.updatedAt = relativeDate(now, -3 + index, 10, 0);
+        });
+      }
+    }
+  });
+}
+
+async function updateVersionSixExampleTone(now: Date) {
+  const memories = await database.get<Memory>('memories').query().fetch();
+  const copyById = new Map<string, string>(
+    Object.entries(versionSixMemoryCopy),
+  );
+  const existingExamples = memories.filter(memory => copyById.has(memory.id));
+
+  await database.write(async () => {
+    for (const memory of existingExamples) {
+      await memory.update(record => {
+        record.content = copyById.get(memory.id) ?? record.content;
+        record.updatedAt = now;
+      });
+    }
+  });
+}
+
 export async function seedProductExamples(userId: string, now = new Date()) {
   const installedVersion = await database.localStorage.get(
     productExamplesSeededKey,
@@ -304,9 +487,26 @@ export async function seedProductExamples(userId: string, now = new Date()) {
   if (installedVersionNumber >= productExamplesVersion) {
     return false;
   }
+  if (installedVersionNumber === 5) {
+    await updateVersionSixExampleTone(now);
+    await database.localStorage.set(
+      productExamplesSeededKey,
+      productExamplesVersion,
+    );
+    return true;
+  }
+  if (installedVersionNumber === 4) {
+    await seedVersionFiveExamples(userId, now);
+    await database.localStorage.set(
+      productExamplesSeededKey,
+      productExamplesVersion,
+    );
+    return true;
+  }
   if ([1, 2, 3].includes(installedVersionNumber)) {
     await retireLegacyLiteraryExamples();
     await seedLiteraryExamples(userId, now, installedVersionNumber === 1);
+    await seedVersionFiveExamples(userId, now);
     await database.localStorage.set(
       productExamplesSeededKey,
       productExamplesVersion,
@@ -334,8 +534,7 @@ export async function seedProductExamples(userId: string, now = new Date()) {
     {
       id: rainMemoryId,
       type: 'text',
-      content:
-        '雨停在傍晚六点十七分。便利店门口的伞一把把合起来，叶尖还挂着水。我没有急着回去，沿河多走了十分钟。原来一天里，真的可以有一小段路，不用赶往任何地方。',
+      content: versionSixMemoryCopy['example-memory-rain-walk'],
       placeId: 'example-place-hangzhou',
       placeDetail: '苏州 · 平江路',
       tags: ['雨后', '河边', '慢一点'],
@@ -345,8 +544,7 @@ export async function seedProductExamples(userId: string, now = new Date()) {
     {
       id: morningMemoryId,
       type: 'anchor',
-      content:
-        '清晨醒得很早。窗帘缝里先亮了一线，屋里还没有声音。我烧了水，坐着等它沸腾，忽然觉得今天还没有被任何事情拿走。',
+      content: versionSixMemoryCopy['example-memory-quiet-morning'],
       placeDetail: '窗边',
       tags: ['清晨', '水沸之前', '留白'],
       mood: 'warm',
@@ -364,8 +562,7 @@ export async function seedProductExamples(userId: string, now = new Date()) {
     {
       id: arrivedMemoryId,
       type: 'text',
-      content:
-        '展信安。\n\n写下这封信时，窗外也刚下过雨。我不知道你现在走到了哪里，只想问一句：那些总觉得来不及的事，后来真的有那么要紧吗？\n\n愿你仍肯为一阵风停下来，也仍能认出自己真正想去的方向。',
+      content: versionSixMemoryCopy['example-memory-letter-arrived'],
       placeDetail: '旧住处的书桌',
       tags: ['未来信', '雨后', '问候'],
       mood: 'soft',
@@ -378,8 +575,7 @@ export async function seedProductExamples(userId: string, now = new Date()) {
     {
       id: travelingMemoryId,
       type: 'text',
-      content:
-        '等这封信到达时，春天应该已经站稳了。希望你去看过一次真正安静的海，也希望你不再把休息当作需要解释的事情。',
+      content: versionSixMemoryCopy['example-memory-letter-traveling'],
       placeDetail: '夜班车最后一排',
       tags: ['未来信', '春天', '海'],
       mood: 'calm',
@@ -642,6 +838,7 @@ export async function seedProductExamples(userId: string, now = new Date()) {
   });
 
   await seedLiteraryExamples(userId, now);
+  await seedVersionFiveExamples(userId, now);
   await database.localStorage.set(
     productExamplesSeededKey,
     productExamplesVersion,

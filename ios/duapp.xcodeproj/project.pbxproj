@@ -15,6 +15,7 @@
 		A10000000000000000000003 /* NotoSerifSC-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* NotoSerifSC-Regular.ttf */; };
 		C14FCAE324A1464FA0D46BD5 /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 34FBE480FE7246C8A56E40A0 /* Colors.xcassets */; };
 		D0F11E5A0000000000000002 /* DuFileShare.m in Sources */ = {isa = PBXBuildFile; fileRef = D0F11E5A0000000000000001 /* DuFileShare.m */; };
+                D0F11E5A0000000000000004 /* DuGeocoder.m in Sources */ = {isa = PBXBuildFile; fileRef = D0F11E5A0000000000000003 /* DuGeocoder.m */; };
 		E596EB70E849B8E71EF1838E /* Pods_duapp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E6DADB367038C0D32A576A1 /* Pods_duapp.framework */; };
 		F4B99734C28E51747DD19E30 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		F8814D0058A043B28A8144BC /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F59AB32AC46443088B677582 /* BootSplash.storyboard */; };
@@ -35,6 +36,7 @@
 		B10000000000000000000002 /* CormorantGaramond-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "CormorantGaramond-Italic.ttf"; path = "../assets/fonts/CormorantGaramond-Italic.ttf"; sourceTree = SOURCE_ROOT; };
 		B10000000000000000000003 /* NotoSerifSC-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "NotoSerifSC-Regular.ttf"; path = "../assets/fonts/NotoSerifSC-Regular.ttf"; sourceTree = SOURCE_ROOT; };
 		D0F11E5A0000000000000001 /* DuFileShare.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DuFileShare.m; path = duapp/DuFileShare.m; sourceTree = "<group>"; };
+                D0F11E5A0000000000000003 /* DuGeocoder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DuGeocoder.m; path = duapp/DuGeocoder.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F59AB32AC46443088B677582 /* BootSplash.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = BootSplash.storyboard; path = duapp/BootSplash.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,6 +62,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				D0F11E5A0000000000000001 /* DuFileShare.m */,
+                                D0F11E5A0000000000000003 /* DuGeocoder.m */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -271,6 +274,7 @@
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				D0F11E5A0000000000000002 /* DuFileShare.m in Sources */,
+                                D0F11E5A0000000000000004 /* DuGeocoder.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

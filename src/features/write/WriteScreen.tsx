@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActionSheetIOS,
   Alert,
@@ -15,10 +16,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
   CompositeNavigationProp,
@@ -54,6 +55,7 @@ import Svg, {
 import { OverlayPortal } from '../../components/OverlayHost';
 import { useToast } from '../../components/Toast';
 import { createMemory } from '../../db/memoryRepository';
+import { getLatestRecognizedCity } from '../../db/placeRepository';
 import {
   AudioAttachment,
   useAudioRecorder,
@@ -70,6 +72,11 @@ import {
   requestLocationAccess,
 } from '../../services/contextPermissions';
 import { removeMediaFile } from '../../services/mediaStorage';
+import {
+  resolveCurrentPlace,
+  resolveManualPlace,
+} from '../../services/placeGeocoding';
+import { recognizeCity, RecognizedCity } from '../../services/placeRecognition';
 import { pickPhotoFromLibrary } from '../../services/photoLibrary';
 import {
   requestLetterNotificationAccess,
@@ -108,6 +115,9 @@ type DraftSaveState = 'idle' | 'saving' | 'saved' | 'failed';
 const FEELINGS_COLLAPSED_HEIGHT = 104;
 const FEELINGS_EXPANDED_HEIGHT = 236;
 const CUSTOM_FEELING_MAX_LENGTH = 12;
+const manualPlaceGuideSeenKey = 'du-manual-place-guide-seen-v1';
+const manualPlaceGuideMessage =
+  '写“城市 · 具体地点”最准确，例如“哈尔滨 · 中央大街”。识别出的城市会计入足迹；“中央大街”或“窗台边”这类地点可以保存，但不会被擅自归入某座城市。';
 const writeFutureOptions: {
   id:
     | Exclude<ArrivalPreset, 'one_month' | 'next_birthday' | 'custom'>
@@ -480,8 +490,15 @@ export function WriteScreen() {
   const [audioAttachment, setAudioAttachment] = useState<AudioAttachment>();
   const [inkImagePath, setInkImagePath] = useState<string>();
   const [placeDetail, setPlaceDetail] = useState<string>();
+  const [placeCity, setPlaceCity] = useState<RecognizedCity>();
+  const [recentPlaceCity, setRecentPlaceCity] = useState<RecognizedCity>();
   const [manualPlaceDraft, setManualPlaceDraft] = useState('');
   const [showManualPlace, setShowManualPlace] = useState(false);
+  const [resolvingPlace, setResolvingPlace] = useState(false);
+  const manualCityPreview = useMemo(
+    () => recognizeCity(manualPlaceDraft),
+    [manualPlaceDraft],
+  );
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [draftSaveState, setDraftSaveState] = useState<DraftSaveState>('idle');
   const [showCamera, setShowCamera] = useState(false);
@@ -489,6 +506,7 @@ export function WriteScreen() {
   const contentInputRef = useRef<TextInput>(null);
   const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftIdRef = useRef<string | undefined>(undefined);
+  const manualPlaceGuideRequestRef = useRef(false);
   const publishingRef = useRef(false);
   const previousAssetSignature = useRef('');
   const stampScale = useSharedValue(1);
@@ -517,6 +535,7 @@ export function WriteScreen() {
       audioDuration: audioAttachment?.duration,
       inkImagePath,
       placeDetail,
+      placeCity,
     }),
     [
       audioAttachment?.duration,
@@ -528,6 +547,7 @@ export function WriteScreen() {
       isFuture,
       photoPath,
       placeDetail,
+      placeCity,
       selectedTags,
     ],
   );
@@ -587,9 +607,13 @@ export function WriteScreen() {
 
   useEffect(() => {
     let mounted = true;
-    getLatestWriteDraft()
-      .then(draft => {
-        if (!mounted || !draft) {
+    Promise.all([getLatestWriteDraft(), getLatestRecognizedCity()])
+      .then(([draft, recentCity]) => {
+        if (!mounted) {
+          return;
+        }
+        setRecentPlaceCity(draft?.placeCity ?? recentCity);
+        if (!draft) {
           return;
         }
         draftIdRef.current = draft.id;
@@ -609,6 +633,7 @@ export function WriteScreen() {
         );
         setInkImagePath(draft.inkImagePath);
         setPlaceDetail(draft.placeDetail);
+        setPlaceCity(draft.placeCity);
         setDraftSaveState('saved');
       })
       .catch(error => {
@@ -943,6 +968,49 @@ export function WriteScreen() {
     toast.show('手书已落下');
   };
 
+  const openManualPlace = useCallback(() => {
+    setManualPlaceDraft(placeDetail ?? '');
+    const openSheet = () => setShowManualPlace(true);
+
+    if (manualPlaceGuideRequestRef.current) {
+      openSheet();
+      return;
+    }
+    manualPlaceGuideRequestRef.current = true;
+
+    AsyncStorage.getItem(manualPlaceGuideSeenKey)
+      .then(seen => {
+        if (seen === 'true') {
+          openSheet();
+          return;
+        }
+        Alert.alert(
+          '怎样写地点',
+          manualPlaceGuideMessage,
+          [
+            {
+              text: '开始填写',
+              onPress: () => {
+                AsyncStorage.setItem(manualPlaceGuideSeenKey, 'true').catch(
+                  () => undefined,
+                );
+                openSheet();
+              },
+            },
+          ],
+          { cancelable: false },
+        );
+      })
+      .catch(() => {
+        Alert.alert(
+          '怎样写地点',
+          manualPlaceGuideMessage,
+          [{ text: '开始填写', onPress: openSheet }],
+          { cancelable: false },
+        );
+      });
+  }, [placeDetail]);
+
   const addLocation = async () => {
     const permission = await requestLocationAccess();
     if (permission === 'blocked') {
@@ -953,10 +1021,7 @@ export function WriteScreen() {
           { text: '取消', style: 'cancel' },
           {
             text: '手动填写',
-            onPress: () => {
-              setManualPlaceDraft(placeDetail ?? '');
-              setShowManualPlace(true);
-            },
+            onPress: openManualPlace,
           },
           {
             text: '系统设置',
@@ -968,22 +1033,32 @@ export function WriteScreen() {
       return;
     }
     if (permission !== 'granted') {
-      setManualPlaceDraft(placeDetail ?? '');
-      setShowManualPlace(true);
+      openManualPlace();
       return;
     }
     Geolocation.getCurrentPosition(
-      position => {
+      async position => {
         const latitude = position.coords.latitude.toFixed(5);
         const longitude = position.coords.longitude.toFixed(5);
-        setPlaceDetail(`${latitude}, ${longitude}`);
+        const resolved = await resolveCurrentPlace(
+          position.coords.latitude,
+          position.coords.longitude,
+        );
+        setPlaceDetail(resolved?.detail ?? `${latitude}, ${longitude}`);
+        setPlaceCity(resolved?.city);
+        if (resolved) {
+          setRecentPlaceCity(resolved.city);
+        }
         haptics.trigger('selection');
-        toast.show('已标记当前位置');
+        toast.show(
+          resolved
+            ? `已识别为${resolved.city.name}`
+            : '已保存坐标，暂未识别所在城市',
+        );
       },
       () => {
         toast.show('暂时没有读到位置，可以手动写下地点');
-        setManualPlaceDraft(placeDetail ?? '');
-        setShowManualPlace(true);
+        openManualPlace();
       },
       {
         enableHighAccuracy: true,
@@ -993,7 +1068,7 @@ export function WriteScreen() {
     );
   };
 
-  const saveManualPlace = () => {
+  const saveManualPlace = async () => {
     const normalized = manualPlaceDraft.trim();
     if (!normalized) {
       toast.show('请写下一个地点');
@@ -1003,10 +1078,49 @@ export function WriteScreen() {
       toast.show('地点最多 60 个字');
       return;
     }
-    setPlaceDetail(normalized);
+    setResolvingPlace(true);
+    const resolved = await resolveManualPlace(normalized);
+    setResolvingPlace(false);
+    if (!resolved && recentPlaceCity) {
+      Alert.alert(
+        '确认足迹城市',
+        `“${normalized}”无法单独确定城市。是否按${recentPlaceCity.name}记录？`,
+        [
+          {
+            text: '仅保存地点',
+            onPress: () => {
+              setPlaceDetail(normalized);
+              setPlaceCity(undefined);
+              setShowManualPlace(false);
+              toast.show('地点已保存；未计入城市足迹');
+            },
+          },
+          {
+            text: `计入${recentPlaceCity.name}`,
+            onPress: () => {
+              setPlaceDetail(`${recentPlaceCity.name} · ${normalized}`);
+              setPlaceCity(recentPlaceCity);
+              setShowManualPlace(false);
+              toast.show(`已计入${recentPlaceCity.name}足迹`);
+            },
+          },
+          { text: '重写', style: 'cancel' },
+        ],
+      );
+      return;
+    }
+    setPlaceDetail(resolved?.detail ?? normalized);
+    setPlaceCity(resolved?.city);
+    if (resolved) {
+      setRecentPlaceCity(resolved.city);
+    }
     setShowManualPlace(false);
     haptics.trigger('selection');
-    toast.show('已写下地点');
+    toast.show(
+      resolved
+        ? `已识别为${resolved.city.name}，将计入足迹`
+        : '地点已保存；未识别城市，不计入足迹',
+    );
   };
 
   const handleToolPress = (tool: string) => {
@@ -1149,6 +1263,7 @@ export function WriteScreen() {
             audioDuration: audioAttachment?.duration,
             inkImagePath,
             placeDetail,
+            placeCity,
           },
           arriveDate,
           arriveType: futureArriveType,
@@ -1176,6 +1291,7 @@ export function WriteScreen() {
           setAudioAttachment(undefined);
           setInkImagePath(undefined);
           setPlaceDetail(undefined);
+          setPlaceCity(undefined);
           setDraftSaveState('idle');
           setSaving(false);
           publishingRef.current = false;
@@ -1202,6 +1318,7 @@ export function WriteScreen() {
         audioDuration: audioAttachment?.duration,
         inkImagePath,
         placeDetail,
+        placeCity,
         writtenAt: new Date(),
       });
       draftIdRef.current = undefined;
@@ -1218,6 +1335,7 @@ export function WriteScreen() {
         setAudioAttachment(undefined);
         setInkImagePath(undefined);
         setPlaceDetail(undefined);
+        setPlaceCity(undefined);
         setDraftSaveState('idle');
         setSaving(false);
         publishingRef.current = false;
@@ -1499,7 +1617,10 @@ export function WriteScreen() {
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel="移除位置"
-                      onPress={() => setPlaceDetail(undefined)}
+                      onPress={() => {
+                        setPlaceDetail(undefined);
+                        setPlaceCity(undefined);
+                      }}
                       style={styles.locationAttachment}
                     >
                       <Text
@@ -1792,9 +1913,6 @@ export function WriteScreen() {
             <Text style={[styles.manualPlaceTitle, { color: colors.text }]}>
               写下此刻地点
             </Text>
-            <Text style={[styles.manualPlaceHint, { color: colors.textMuted }]}>
-              不需要定位权限，只保存在这条日迹里。
-            </Text>
             <TextInput
               accessibilityLabel="手动地点"
               autoFocus
@@ -1811,6 +1929,21 @@ export function WriteScreen() {
                 },
               ]}
             />
+            {manualPlaceDraft.trim() ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[
+                  styles.manualPlaceRecognition,
+                  {
+                    color: manualCityPreview ? colors.accent : colors.textFaint,
+                  },
+                ]}
+              >
+                {manualCityPreview
+                  ? `将计入足迹：${manualCityPreview.name}`
+                  : '写下后会尝试通过系统地图识别全球城市'}
+              </Text>
+            ) : null}
             <View style={styles.manualPlaceActions}>
               <Pressable
                 accessibilityRole="button"
@@ -1830,13 +1963,16 @@ export function WriteScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="保存手动地点"
+                disabled={resolvingPlace}
                 onPress={saveManualPlace}
                 style={[
                   styles.manualPlaceSave,
                   { backgroundColor: colors.seal },
                 ]}
               >
-                <Text style={styles.manualPlaceSaveText}>写下</Text>
+                <Text style={styles.manualPlaceSaveText}>
+                  {resolvingPlace ? '识别中' : '写下'}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -2138,12 +2274,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.serifMedium,
     fontSize: 18,
   },
-  manualPlaceHint: {
-    marginTop: spacing.xs,
-    fontFamily: fontFamilies.serif,
-    fontSize: 11,
-    lineHeight: 18,
-  },
   manualPlaceInput: {
     minHeight: 46,
     marginTop: spacing.lg,
@@ -2152,6 +2282,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.paper,
     fontFamily: fontFamilies.serif,
     fontSize: 14,
+  },
+  manualPlaceRecognition: {
+    minHeight: 18,
+    marginTop: spacing.sm,
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    lineHeight: 16,
   },
   manualPlaceActions: {
     marginTop: spacing.lg,

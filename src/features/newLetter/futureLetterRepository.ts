@@ -51,6 +51,9 @@ export async function createFutureLetter({
         record.audioDuration = draft.audioDuration;
         record.inkImagePath = prepared[2].path;
         record.placeDetail = draft.placeDetail;
+        record.placeCity = draft.placeCity?.name;
+        record.placeRegion = draft.placeCity?.region;
+        record.placeCountryCode = draft.placeCity?.countryCode;
         record.bodyTags = '[]';
         record.heartTags = '[]';
         record.customTags = JSON.stringify(draft.customTags);

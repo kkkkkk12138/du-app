@@ -1,5 +1,6 @@
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Pressable, StyleSheet,  View} from 'react-native';
+import {AppText as Text} from "./AppText";
 import {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import Svg, {
   Defs,

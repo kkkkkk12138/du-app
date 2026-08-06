@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet,  View } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 import DatePicker from 'react-native-date-picker';
 
 import { OverlayPortal } from '../../components/OverlayHost';

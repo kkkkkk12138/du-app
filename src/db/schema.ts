@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 13,
+  version: 14,
   tables: [
     tableSchema({
       name: 'users',
@@ -34,6 +34,8 @@ export const schema = appSchema({
         { name: 'last_visit', type: 'number', isOptional: true },
         { name: 'visit_count', type: 'number' },
         { name: 'sort_order', type: 'number' },
+        { name: 'region', type: 'string', isOptional: true },
+        { name: 'country_code', type: 'string', isOptional: true },
       ],
     }),
     tableSchema({
@@ -48,6 +50,9 @@ export const schema = appSchema({
         { name: 'ink_image_path', type: 'string', isOptional: true },
         { name: 'place_id', type: 'string', isOptional: true, isIndexed: true },
         { name: 'place_detail', type: 'string', isOptional: true },
+        { name: 'place_city', type: 'string', isOptional: true },
+        { name: 'place_region', type: 'string', isOptional: true },
+        { name: 'place_country_code', type: 'string', isOptional: true },
         { name: 'weather_tag', type: 'string', isOptional: true },
         { name: 'body_tags', type: 'string' },
         { name: 'heart_tags', type: 'string' },

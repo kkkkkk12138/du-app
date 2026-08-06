@@ -6,7 +6,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet,  View } from 'react-native';
+import {AppText as Text} from "./AppText";
 import BootSplash from 'react-native-bootsplash';
 
 import { verifyMemoryRoundTrip } from '../db/memoryRepository';

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet,  View } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 
 import { Memory } from '../../db/models';
 import { fontFamilies } from '../../tokens/typography';

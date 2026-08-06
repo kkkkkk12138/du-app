@@ -7,9 +7,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 import DatePicker from 'react-native-date-picker';
 import {
   NavigationProp,

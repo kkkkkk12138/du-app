@@ -149,7 +149,7 @@ test('exports a versioned backup with raw records and verified assets', async ()
   expect(manifest).toMatchObject({
     format: 'du-local-backup',
     version: 1,
-    schemaVersion: 13,
+    schemaVersion: 14,
   });
   expect(manifest.tables.memories[0]).toEqual(memory._raw);
   expect(manifest.assets).toEqual(

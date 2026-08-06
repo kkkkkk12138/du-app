@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Image, Pressable, StyleSheet,  View} from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 import {Camera, useCameraDevice} from 'react-native-vision-camera';
 import {SafeAreaView} from 'react-native-safe-area-context';
 

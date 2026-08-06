@@ -4,9 +4,9 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 import Animated, {
   Easing,
   useAnimatedStyle,

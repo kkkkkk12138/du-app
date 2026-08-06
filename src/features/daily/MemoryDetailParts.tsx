@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet,  View } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 
 import { Memory } from '../../db/models';
 import { useAudioPlayback } from '../../hooks/useAudioPlayback';

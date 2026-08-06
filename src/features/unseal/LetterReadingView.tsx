@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet,  View } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 
 import type { LetterWithMemory } from '../letters/lettersRepository';
 import {

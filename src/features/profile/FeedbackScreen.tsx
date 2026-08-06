@@ -4,10 +4,10 @@ import {
   Pressable,
   Share,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

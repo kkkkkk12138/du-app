@@ -7,7 +7,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {StyleSheet, Text} from 'react-native';
+import {StyleSheet} from 'react-native';
+import {AppText as Text} from "./AppText";
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,

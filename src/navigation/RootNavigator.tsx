@@ -31,6 +31,7 @@ import { UnsealScreen } from '../features/unseal/UnsealScreen';
 import { WriteScreen } from '../features/write/WriteScreen';
 import { useTheme } from '../theme/useTheme';
 import { linking } from './linking';
+import type {RecognizedCity} from '../services/placeRecognition';
 
 export type MainTabParamList = {
   Daily: { newMemoryId?: string } | undefined;
@@ -50,6 +51,7 @@ export type FutureLetterDraft = {
   audioDuration?: number;
   inkImagePath?: string;
   placeDetail?: string;
+  placeCity?: RecognizedCity;
 };
 
 export type RootStackParamList = {

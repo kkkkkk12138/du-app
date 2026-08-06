@@ -16,30 +16,48 @@ function createDuNumber(id: string) {
   return numeric.toString().padStart(6, '0');
 }
 
+async function getDatabaseAnonymousId() {
+  const settings = await database
+    .get<Setting>('settings')
+    .query(Q.where('id', settingsRecordId))
+    .fetch();
+  if (settings[0]?.userId) {
+    return settings[0].userId;
+  }
+
+  const users = await database.get<User>('users').query().fetch();
+  return users[0]?.id;
+}
+
 async function getOrCreateAnonymousId() {
-  const credentials = await Keychain.getGenericPassword({
-    service: keychainService,
-  });
-
-  if (credentials) {
-    return credentials.password;
-  }
-
-  const anonymousId = randomId();
-  const saved = await Keychain.setGenericPassword(
-    'anonymous-user',
-    anonymousId,
-    {
+  try {
+    const credentials = await Keychain.getGenericPassword({
       service: keychainService,
-      accessible: Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-    },
-  );
+    });
 
-  if (!saved) {
-    throw new Error('无法将匿名身份写入系统安全存储');
+    if (credentials) {
+      return credentials.password;
+    }
+
+    const databaseId = await getDatabaseAnonymousId();
+    const anonymousId = databaseId ?? randomId();
+    const saved = await Keychain.setGenericPassword(
+      'anonymous-user',
+      anonymousId,
+      {
+        service: keychainService,
+        accessible: Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+      },
+    );
+
+    if (!saved) {
+      throw new Error('无法将匿名身份写入系统安全存储');
+    }
+
+    return anonymousId;
+  } catch {
+    return (await getDatabaseAnonymousId()) ?? randomId();
   }
-
-  return anonymousId;
 }
 
 async function ensureUserRecord(anonymousId: string) {

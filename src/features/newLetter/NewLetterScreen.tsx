@@ -5,7 +5,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet,  View } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 import {
   RouteProp,
   useFocusEffect,

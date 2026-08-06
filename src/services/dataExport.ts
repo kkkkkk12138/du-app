@@ -53,7 +53,7 @@ export type BackupAsset = {
 export type FullBackupManifest = {
   format: 'du-local-backup';
   version: 1;
-  schemaVersion: 13;
+  schemaVersion: 14;
   exportedAt: string;
   tables: Record<BackupTable, BackupRawRecord[]>;
   assets: BackupAsset[];
@@ -356,7 +356,7 @@ export async function createFullBackupFile() {
     const manifest: FullBackupManifest = {
       format: 'du-local-backup',
       version: 1,
-      schemaVersion: 13,
+      schemaVersion: 14,
       exportedAt: new Date().toISOString(),
       tables: rawTables,
       assets,

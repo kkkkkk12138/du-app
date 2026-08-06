@@ -1,5 +1,6 @@
 import {reconcileLetterArrivals} from '../features/letters/lettersRepository';
 import {getDraftMediaPaths} from '../features/write/draftRepository';
+import {reconcileMemoryPlaces} from '../db/placeRepository';
 import {clearAbandonedDraftMedia} from './mediaStorage';
 
 function reportMaintenanceError(message: string, error: unknown) {
@@ -26,5 +27,12 @@ export async function runForegroundDataMaintenance() {
     reportMaintenanceError('草稿附件清理失败', error);
   }
 
-  return {arrivedCount};
+  let reconciledPlaceCount = 0;
+  try {
+    reconciledPlaceCount = await reconcileMemoryPlaces();
+  } catch (error) {
+    reportMaintenanceError('日迹城市归档失败', error);
+  }
+
+  return {arrivedCount, reconciledPlaceCount};
 }

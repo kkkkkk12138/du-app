@@ -32,6 +32,8 @@ export class Place extends Model {
   @date('last_visit') lastVisit?: Date;
   @field('visit_count') visitCount!: number;
   @field('sort_order') sortOrder!: number;
+  @field('region') region?: string;
+  @field('country_code') countryCode?: string;
 }
 
 export class Memory extends Model {
@@ -46,6 +48,9 @@ export class Memory extends Model {
   @field('ink_image_path') inkImagePath?: string;
   @field('place_id') placeId?: string;
   @field('place_detail') placeDetail?: string;
+  @field('place_city') placeCity?: string;
+  @field('place_region') placeRegion?: string;
+  @field('place_country_code') placeCountryCode?: string;
   @field('weather_tag') weatherTag?: string;
   @text('body_tags') bodyTags!: string;
   @text('heart_tags') heartTags!: string;

@@ -4,10 +4,10 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { AppText as Text } from '../../components/AppText';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -49,6 +49,15 @@ const emptyData: FarawayViewData = {
 };
 function formatMemoryDate(date: Date) {
   return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()}`;
+}
+
+function formatCityPinyin(value: string) {
+  const compact = value.replace(/\s+/gu, '').toLocaleUpperCase();
+  if (compact.length <= 8) {
+    return compact;
+  }
+  const breakAt = Math.ceil(compact.length / 2);
+  return `${compact.slice(0, breakAt)}\n${compact.slice(breakAt)}`;
 }
 
 function SectionTitle({ children }: { children: string }) {
@@ -247,8 +256,11 @@ function PlaceCard({
         <Text style={[styles.placeCharacter, { color: place.colorHex }]}>
           {place.chChar}
         </Text>
-        <Text style={[styles.placePinyin, { color: colors.textFaint }]}>
-          {place.pinyin}
+        <Text
+          numberOfLines={2}
+          style={[styles.placePinyin, { color: colors.textFaint }]}
+        >
+          {formatCityPinyin(place.pinyin)}
         </Text>
         <View style={[styles.placeDot, { backgroundColor: place.colorHex }]} />
       </View>
@@ -933,20 +945,27 @@ const styles = StyleSheet.create({
     gap: spacing.gap,
   },
   placeMark: {
-    width: 40,
+    width: 56,
     alignItems: 'center',
-    paddingTop: spacing.xxs,
   },
   placeCharacter: {
+    width: 56,
+    height: 30,
     fontFamily: fontFamilies.serifMedium,
     fontSize: 20,
-    lineHeight: 22,
+    lineHeight: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
   placePinyin: {
     marginTop: 3,
+    width: 56,
+    minHeight: 22,
     fontFamily: fontFamilies.englishSerif,
     fontSize: 9,
+    lineHeight: 11,
     letterSpacing: 1,
+    textAlign: 'center',
     textTransform: 'uppercase',
   },
   placeDot: {

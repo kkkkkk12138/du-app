@@ -2,6 +2,8 @@ import { Q } from '@nozbe/watermelondb';
 
 import { database } from '../../db/database';
 import { Memory, Place, User } from '../../db/models';
+import { reconcileMemoryPlaces } from '../../db/placeRepository';
+import { cityMark, cityPinyin } from '../../services/placeRecognition';
 import {
   buildFarawayViewData,
   FarawayMemory,
@@ -26,6 +28,7 @@ async function getUser(anonymousId?: string) {
 }
 
 export async function getFarawayData(anonymousId?: string, now = new Date()) {
+  await reconcileMemoryPlaces();
   const [user, places, memories] = await Promise.all([
     getUser(anonymousId),
     database.get<Place>('places').query(Q.sortBy('sort_order', Q.desc)).fetch(),
@@ -53,8 +56,8 @@ export async function getFarawayData(anonymousId?: string, now = new Date()) {
         ({
           id: place.id,
           name: place.name,
-          chChar: place.chChar,
-          pinyin: place.pinyin,
+          chChar: cityMark(place.name),
+          pinyin: place.pinyin || cityPinyin(place.name),
           colorHex: place.colorHex,
           type: place.type,
           firstVisit: place.firstVisit,

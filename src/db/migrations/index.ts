@@ -289,5 +289,25 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 14,
+      steps: [
+        addColumns({
+          table: 'places',
+          columns: [
+            {name: 'region', type: 'string', isOptional: true},
+            {name: 'country_code', type: 'string', isOptional: true},
+          ],
+        }),
+        addColumns({
+          table: 'memories',
+          columns: [
+            {name: 'place_city', type: 'string', isOptional: true},
+            {name: 'place_region', type: 'string', isOptional: true},
+            {name: 'place_country_code', type: 'string', isOptional: true},
+          ],
+        }),
+      ],
+    },
   ],
 });

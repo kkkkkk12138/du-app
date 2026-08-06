@@ -2,6 +2,7 @@ import { Q } from '@nozbe/watermelondb';
 
 import { database } from '../../db/database';
 import { Letter, Memory, Place, Quest, User, Wish } from '../../db/models';
+import {reconcileMemoryPlaces} from '../../db/placeRepository';
 import {
   finalizePreparedMedia,
   prepareMediaForPersistence,
@@ -40,6 +41,7 @@ async function getUser(anonymousId?: string) {
 export async function getProfileData(
   anonymousId?: string,
 ): Promise<ProfileData> {
+  await reconcileMemoryPlaces();
   const [user, memories, places, letterCount, wishCount, questCount] =
     await Promise.all([
       getUser(anonymousId),

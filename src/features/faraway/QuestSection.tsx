@@ -11,10 +11,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import {AppText as Text} from "../../components/AppText";
 import Svg, { Path } from 'react-native-svg';
 
 import { OverlayPortal } from '../../components/OverlayHost';
