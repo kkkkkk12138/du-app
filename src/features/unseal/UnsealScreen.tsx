@@ -107,25 +107,6 @@ function EnvelopeBase() {
   );
 }
 
-function EnvelopeTop() {
-  return (
-    <Svg
-      height="100%"
-      width="100%"
-      preserveAspectRatio="none"
-      viewBox="0 0 260 102"
-    >
-      <Defs>
-        <LinearGradient id="envelopeTop" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#DCC8A3" />
-          <Stop offset="1" stopColor="#CEB78D" />
-        </LinearGradient>
-      </Defs>
-      <Polygon points="0,0 260,0 130,102" fill="url(#envelopeTop)" />
-    </Svg>
-  );
-}
-
 function WaxSeal({ small = false }: { small?: boolean }) {
   return (
     <View style={small ? styles.miniWax : styles.wax}>
@@ -153,7 +134,6 @@ export function UnsealScreen() {
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const loadRequest = useRef(0);
   const sealProgress = useSharedValue(0);
-  const flapProgress = useSharedValue(0);
   const previewProgress = useSharedValue(0);
   const sealedProgress = useSharedValue(1);
   const openProgress = useSharedValue(0);
@@ -205,40 +185,22 @@ export function UnsealScreen() {
   useEffect(
     () => () => {
       clearTimers();
-      [
-        sealProgress,
-        flapProgress,
-        previewProgress,
-        sealedProgress,
-        openProgress,
-      ].forEach(cancelAnimation);
+      [sealProgress, previewProgress, sealedProgress, openProgress].forEach(
+        cancelAnimation,
+      );
     },
-    [
-      clearTimers,
-      flapProgress,
-      openProgress,
-      previewProgress,
-      sealProgress,
-      sealedProgress,
-    ],
+    [clearTimers, openProgress, previewProgress, sealProgress, sealedProgress],
   );
 
   const sealStyle = useAnimatedStyle(() => ({
     opacity: 1 - sealProgress.value,
     transform: [{ scale: 1 - sealProgress.value * 0.4 }],
   }));
-  const flapStyle = useAnimatedStyle(() => ({
-    transform: [
-      { perspective: 800 },
-      { rotateX: `${-170 * flapProgress.value}deg` },
-    ],
-  }));
   const previewStyle = useAnimatedStyle(() => ({
     opacity: previewProgress.value,
     transform: [
-      { translateY: 70 - previewProgress.value * 108 },
+      { translateY: 54 - previewProgress.value * 82 },
       { scale: 0.92 + previewProgress.value * 0.08 },
-      { rotateY: `${-2 + previewProgress.value * 2}deg` },
     ],
   }));
   const sealedStyle = useAnimatedStyle(() => ({
@@ -267,52 +229,44 @@ export function UnsealScreen() {
     haptics.trigger('button');
 
     if (reduceMotion) {
-      sealedProgress.value = withTiming(0, { duration: 220 });
-      openProgress.value = withDelay(100, withTiming(1, { duration: 300 }));
+      sealedProgress.value = withTiming(0, { duration: 160 });
+      openProgress.value = withDelay(80, withTiming(1, { duration: 220 }));
       schedule(() => {
         setOpened(true);
         markLetterOpened(item.letter).catch(error =>
           console.error('更新拆信状态失败', error),
         );
         haptics.trigger('envelopeOpen');
-      }, 400);
+      }, 300);
       return;
     }
 
     sealProgress.value = withTiming(1, {
-      duration: 300,
+      duration: 180,
       easing: Easing.in(Easing.cubic),
     });
-    flapProgress.value = withDelay(
-      200,
-      withTiming(1, {
-        duration: 700,
-        easing: Easing.bezier(0.3, 0.05, 0.2, 1),
-      }),
-    );
     previewProgress.value = withDelay(
-      500,
+      100,
       withTiming(1, {
-        duration: 700,
+        duration: 450,
         easing: Easing.bezier(0.2, 0.8, 0.2, 1),
       }),
     );
-    sealedProgress.value = withDelay(1200, withTiming(0, { duration: 400 }));
+    sealedProgress.value = withDelay(550, withTiming(0, { duration: 180 }));
     openProgress.value = withDelay(
-      1700,
+      600,
       withTiming(1, {
-        duration: 400,
+        duration: 250,
         easing: Easing.out(Easing.cubic),
       }),
     );
-    schedule(() => haptics.trigger('record'), 350);
     schedule(() => {
       setOpened(true);
       haptics.trigger('envelopeOpen');
       markLetterOpened(item.letter).catch(error =>
         console.error('更新拆信状态失败', error),
       );
-    }, 2100);
+    }, 850);
   };
 
   const goBack = () => {
@@ -418,6 +372,24 @@ export function UnsealScreen() {
     <View style={styles.screen}>
       <LetterBackground />
       <SafeAreaView style={styles.safeArea}>
+        {!opened ? (
+          <View style={styles.topBar}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`返回${sourceLabel}`}
+              hitSlop={12}
+              onPress={goBack}
+              style={({ pressed }) => [
+                styles.back,
+                { opacity: pressed ? 0.5 : 1 },
+              ]}
+            >
+              <Text style={styles.backText}>收回</Text>
+            </Pressable>
+            <Text style={styles.topBarTitle}>拆信</Text>
+            <View style={styles.topBarBalance} />
+          </View>
+        ) : null}
         <Animated.View
           pointerEvents={opened ? 'none' : 'auto'}
           style={[styles.sealedState, sealedStyle]}
@@ -450,16 +422,13 @@ export function UnsealScreen() {
                 {item.memory.content}
               </Text>
             </Animated.View>
-            <Animated.View style={[styles.envelopeTop, flapStyle]}>
-              <EnvelopeTop />
-            </Animated.View>
             <Animated.View style={[styles.sealLayer, sealStyle]}>
               <WaxSeal />
             </Animated.View>
           </Pressable>
 
           <Text style={styles.openHint}>
-            {opening ? '……' : '轻触火漆印开启'}
+            {opening ? '信纸正从信封里出来……' : '轻触「渡」印拆信'}
           </Text>
           <Text style={styles.driftDate}>
             {formatDate(item.letter.sentAt)} →{' '}
@@ -494,19 +463,6 @@ export function UnsealScreen() {
             onReply={goToWrite}
           />
         </Animated.View>
-
-        {!opened ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`返回${sourceLabel}`}
-            hitSlop={12}
-            onPress={goBack}
-            style={styles.back}
-          >
-            <Text style={styles.backIcon}>‹</Text>
-            <Text style={styles.backText}>收回</Text>
-          </Pressable>
-        ) : null}
       </SafeAreaView>
     </View>
   );
@@ -515,31 +471,37 @@ export function UnsealScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#E8DFCA' },
   safeArea: { flex: 1 },
-  back: {
-    position: 'absolute',
-    top: spacing.sm,
-    left: spacing.xl,
-    zIndex: 20,
-    minWidth: 72,
-    minHeight: 44,
+  topBar: {
+    height: 74,
+    paddingHorizontal: spacing.page,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    zIndex: 50,
+    elevation: 8,
   },
-  backIcon: {
-    color: primitiveColors.ink,
-    fontFamily: fontFamilies.sans,
-    fontSize: 28,
-    lineHeight: 28,
+  back: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backText: {
-    color: primitiveColors.ink,
-    fontFamily: fontFamilies.sans,
-    fontSize: fontSizes.bodyLarge,
+    color: primitiveColors.inkLight,
+    fontFamily: fontFamilies.serif,
+    fontSize: 13,
   },
+  topBarTitle: {
+    flex: 1,
+    color: primitiveColors.ink,
+    textAlign: 'center',
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 15,
+    letterSpacing: 4,
+  },
+  topBarBalance: { width: 44 },
   sealedState: {
     position: 'absolute',
-    top: 0,
+    top: 74,
     right: 0,
     bottom: 0,
     left: 0,
@@ -547,7 +509,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.page,
   },
-  meta: { alignItems: 'center', marginBottom: 36 },
+  meta: { alignItems: 'center', marginBottom: spacing.xl },
   arrivedLabel: {
     marginBottom: spacing.gap,
     color: primitiveColors.accent,
@@ -571,25 +533,16 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   envelope: {
-    width: 260,
-    height: 175,
-    boxShadow: '0 16px 40px rgba(80,50,20,0.25)',
-  },
-  envelopeTop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    left: 0,
-    zIndex: 5,
-    height: 102,
-    transformOrigin: 'top',
+    width: 210,
+    height: 142,
+    boxShadow: '0 12px 32px rgba(80,50,20,0.22)',
   },
   previewPaper: {
     position: 'absolute',
-    top: 31,
-    right: 21,
-    bottom: 18,
-    left: 21,
+    top: 24,
+    right: 17,
+    bottom: 15,
+    left: 17,
     zIndex: 3,
     paddingHorizontal: spacing.cardGap,
     paddingTop: spacing.md,
@@ -613,7 +566,7 @@ const styles = StyleSheet.create({
   },
   sealLayer: {
     position: 'absolute',
-    top: 48,
+    top: 39,
     right: 0,
     left: 0,
     zIndex: 8,

@@ -489,78 +489,6 @@ function TravelingLetterSheet({
   );
 }
 
-function ArrivingLetterSheet({
-  item,
-  onClose,
-  onUnseal,
-}: {
-  item?: LetterWithMemory;
-  onClose: () => void;
-  onUnseal: () => void;
-}) {
-  const { colors } = useTheme();
-  if (!item) {
-    return null;
-  }
-
-  return (
-    <OverlayPortal
-      name="letters-arriving"
-      onRequestClose={onClose}
-      visible={Boolean(item)}
-    >
-      <View style={styles.sheetRoot}>
-        <Pressable
-          accessibilityLabel="收起即将靠岸的信"
-          onPress={onClose}
-          style={styles.sheetBackdrop}
-        />
-        <View
-          accessibilityLabel="将至信详情"
-          accessibilityViewIsModal
-          style={[
-            styles.arrivingSheet,
-            { backgroundColor: colors.surface, borderColor: colors.line },
-          ]}
-        >
-          <View
-            style={[styles.sheetHandle, { backgroundColor: colors.line }]}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="收起即将靠岸的信"
-            onPress={onClose}
-            style={styles.sheetClose}
-          >
-            <Text style={styles.sheetCloseText}>×</Text>
-          </Pressable>
-          <View style={styles.arrivingEnvelopeWrap}>
-            <View style={styles.arrivingEnvelope}>
-              <View style={styles.arrivingEnvelopeFlap} />
-              <View style={styles.arrivingSeal}>
-                <Text style={styles.arrivingSealText}>封</Text>
-              </View>
-            </View>
-          </View>
-          <Text style={styles.arrivingSheetTitle}>有信将至</Text>
-          <Text style={styles.arrivingSheetSubtitle}>一封信正漂向此岸</Text>
-          <Text style={styles.arrivingFrom}>自 那时的你 发来</Text>
-          <Text style={styles.arrivingPoem}>火漆尚温，宜静候</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`拆开${letterTitle(item)}`}
-            onPress={onUnseal}
-            style={styles.arrivingButton}
-          >
-            <Text style={styles.arrivingButtonText}>拆 信</Text>
-          </Pressable>
-          <Text style={styles.arrivingWait}>已抵达此岸 · 现在可拆</Text>
-        </View>
-      </View>
-    </OverlayPortal>
-  );
-}
-
 function OpenedLetterSheet({
   item,
   onClose,
@@ -586,9 +514,7 @@ function OpenedLetterSheet({
   );
   const isReply = item.letter.status === 'reply';
   const paragraphs = splitLetterParagraphs(item.memory.content);
-  const hasWrittenSalutation = startsWithLetterSalutation(
-    item.memory.content,
-  );
+  const hasWrittenSalutation = startsWithLetterSalutation(item.memory.content);
 
   return (
     <OverlayPortal
@@ -784,7 +710,6 @@ export function LettersScreen() {
   const [filter, setFilter] = useState<LetterFilter>('all');
   const [selectedTraveling, setSelectedTraveling] =
     useState<LetterWithMemory>();
-  const [selectedArriving, setSelectedArriving] = useState<LetterWithMemory>();
   const [selectedOpened, setSelectedOpened] = useState<LetterWithMemory>();
 
   const load = useCallback(
@@ -812,7 +737,10 @@ export function LettersScreen() {
             item => item.letter.id === requestedLetterId,
           );
           if (requested) {
-            setSelectedArriving(requested);
+            navigation.navigate('Unseal', {
+              letterId: requested.letter.id,
+              source: 'letters',
+            });
           }
           navigation.setParams({ openArrivedLetterId: undefined });
         }
@@ -999,7 +927,12 @@ export function LettersScreen() {
                 item={item}
                 key={item.letter.id}
                 now={now}
-                onPress={() => setSelectedArriving(item)}
+                onPress={() =>
+                  navigation.navigate('Unseal', {
+                    letterId: item.letter.id,
+                    source: 'letters',
+                  })
+                }
               />
             ))}
           </View>
@@ -1062,21 +995,6 @@ export function LettersScreen() {
         item={selectedTraveling}
         now={now}
         onClose={() => setSelectedTraveling(undefined)}
-      />
-      <ArrivingLetterSheet
-        item={selectedArriving}
-        onClose={() => setSelectedArriving(undefined)}
-        onUnseal={() => {
-          if (!selectedArriving) {
-            return;
-          }
-          const letterId = selectedArriving.letter.id;
-          setSelectedArriving(undefined);
-          navigation.navigate('Unseal', {
-            letterId,
-            source: 'letters',
-          });
-        }}
       />
       <OpenedLetterSheet
         item={selectedOpened}
@@ -1509,110 +1427,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.serif,
     fontSize: 14,
     letterSpacing: 2,
-  },
-  arrivingSheet: {
-    paddingTop: 12,
-    paddingHorizontal: 28,
-    paddingBottom: 40,
-    borderTopWidth: 0.5,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    boxShadow: '0 -8px 30px rgba(58,42,30,0.14)',
-  },
-  arrivingEnvelopeWrap: {
-    alignSelf: 'center',
-    width: 120,
-    height: 100,
-    marginTop: 16,
-    marginBottom: 20,
-  },
-  arrivingEnvelope: {
-    width: 120,
-    height: 84,
-    overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: 'rgba(58,51,45,0.1)',
-    borderRadius: 4,
-    backgroundColor: '#F5EDE0',
-    boxShadow: '0 8px 28px rgba(58,42,30,0.18)',
-  },
-  arrivingEnvelopeFlap: {
-    position: 'absolute',
-    top: -56,
-    left: 18,
-    width: 84,
-    height: 84,
-    backgroundColor: 'rgba(184,122,98,0.25)',
-    transform: [{ rotate: '45deg' }],
-  },
-  arrivingSeal: {
-    position: 'absolute',
-    top: 26,
-    left: 42,
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: '#B85C38',
-    boxShadow: '0 2px 10px rgba(184,122,98,0.4)',
-  },
-  arrivingSealText: {
-    color: '#FFF',
-    fontFamily: fontFamilies.serif,
-    fontSize: 12,
-  },
-  arrivingSheetTitle: {
-    textAlign: 'center',
-    color: '#3A332D',
-    fontFamily: fontFamilies.serif,
-    fontSize: 20,
-    letterSpacing: 3,
-  },
-  arrivingSheetSubtitle: {
-    marginTop: 6,
-    textAlign: 'center',
-    color: '#8B7355',
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-  },
-  arrivingFrom: {
-    marginTop: 8,
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#B85C38',
-    fontFamily: fontFamilies.serif,
-    fontSize: 14,
-  },
-  arrivingPoem: {
-    marginBottom: 24,
-    textAlign: 'center',
-    color: '#B4A58F',
-    fontFamily: fontFamilies.serif,
-    fontSize: 12,
-    fontStyle: 'italic',
-    letterSpacing: 1,
-  },
-  arrivingButton: {
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-    backgroundColor: '#B85C38',
-    boxShadow: '0 6px 20px rgba(184,122,98,0.35)',
-  },
-  arrivingButtonText: {
-    color: '#FFF',
-    fontFamily: fontFamilies.serif,
-    fontSize: 16,
-    letterSpacing: 4,
-  },
-  arrivingWait: {
-    marginTop: 12,
-    textAlign: 'center',
-    color: '#B4A58F',
-    fontFamily: fontFamilies.sans,
-    fontSize: 11,
   },
   openedSheet: {
     maxHeight: '92%',

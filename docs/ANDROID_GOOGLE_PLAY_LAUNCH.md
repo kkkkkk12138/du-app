@@ -1,6 +1,10 @@
 # 渡 Android Google Play 上架指导书
 
-适用对象：以个人开发者身份首次发布“渡”的维护者。本文覆盖本地签名、生成 AAB、Play Console 建档、封闭测试和正式发布，不包含中国大陆安卓应用商店的单独资质流程。
+适用对象：以个人开发者身份首次发布“渡”的维护者。本文覆盖本地签名、生成 AAB、Play Console 建档、封闭测试和正式发布。中国大陆安卓厂商商店不是 Google Play 的一个发布地区，需要分别备案、建档和送审，完整清单见：
+
+```text
+docs/ANDROID_CHINA_STORES_LAUNCH.md
+```
 
 ## 当前状态
 
@@ -137,12 +141,14 @@ Google Play 要求每次上传的 `versionCode` 都大于历史版本。当前�
 1. 打开 `https://play.google.com/console/`。
 2. 使用准备长期持有的 Google 账号登录。
 3. 选择个人开发者账号。
-4. 按页面显示金额支付一次性注册费；金额和税费以注册页面为准。
+4. 支付一次性 25 美元注册费；税费和最终人民币入账金额以注册页面为准。Google 官方说明：`https://support.google.com/googleplay/android-developer/answer/6112435`
 5. 提交真实姓名、地址、电话和开发者联系邮箱。
 6. 完成身份证件、手机号和邮箱验证。
 7. 等待账号验证通过后再创建应用。
 
 个人账号的法定身份资料必须真实。商店公开展示哪些字段，以 Play Console 当前提示为准。
+
+Google Play 不是零成本上架：开发者账号当前收取一次性 25 美元注册费。将应用设为“免费”只代表用户免费下载，不会免除开发者注册费。渡采用“免费下载，后续用应用内购买或订阅提供增值能力”的路线；不要先把下载价格设为付费，因为 Google Play 的免费应用发布后不能直接改成付费下载。
 
 ## 创建应用
 
@@ -246,6 +252,35 @@ docs/google-play/PLAY_STORE_METADATA.md
 测试要求以当前账号控制台显示为准。完成后，Play Console 会开放申请正式版访问权限的入口。
 
 ## Android 真机验收
+
+### 本机模拟器人工测试
+
+当前 Mac 已安装 Android Emulator、Android 15 Google APIs ARM64 系统镜像，并创建：
+
+```text
+DU_API_35
+```
+
+启动：
+
+```sh
+"$HOME/Library/Android/sdk/emulator/emulator" \
+  -avd DU_API_35 \
+  -no-snapshot-save
+```
+
+构建并安装 Release APK：
+
+```sh
+cd android
+./gradlew assembleRelease
+"$HOME/Library/Android/sdk/platform-tools/adb" install -r \
+  app/build/outputs/apk/release/app-release.apk
+"$HOME/Library/Android/sdk/platform-tools/adb" shell am start \
+  -n com.duapp/.MainActivity
+```
+
+模拟器适合检查布局、中文输入、系统返回、文件选择、通知和基础流程，但不能代替真实相机、生物识别、厂商系统后台限制、耗电和推送可靠性测试。
 
 至少使用一台 Android 13 或更高版本真机验证：
 

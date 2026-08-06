@@ -556,9 +556,12 @@ test('opens an archived letter and returns through the mailbox header', async ()
   getLetterDetailMock.mockRejectedValue(new Error('没有可拆的信'));
 });
 
-test('renders distinct prototype sheets for traveling and arriving letters', async () => {
+test('renders the traveling sheet and routes an arriving letter to unseal', async () => {
   const getLettersDataMock = getLettersData as jest.MockedFunction<
     typeof getLettersData
+  >;
+  const getLetterDetailMock = getLetterDetail as jest.MockedFunction<
+    typeof getLetterDetail
   >;
   const memory = {
     id: 'future-memory',
@@ -642,6 +645,7 @@ test('renders distinct prototype sheets for traveling and arriving letters', asy
     opened: [],
     tomorrowCount: 0,
   });
+  getLetterDetailMock.mockResolvedValue(arrivingItem);
   const arrivingRenderer = await renderApp();
   await ReactTestRenderer.act(async () => {
     arrivingRenderer.root
@@ -650,21 +654,29 @@ test('renders distinct prototype sheets for traveling and arriving letters', asy
     await Promise.resolve();
     await Promise.resolve();
   });
-  await ReactTestRenderer.act(() => {
+  await ReactTestRenderer.act(async () => {
     arrivingRenderer.root
       .findByProps({ accessibilityLabel: '拆开写给未来的自己' })
       .props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
   });
   expect(
     arrivingRenderer.root.findByProps({
-      accessibilityLabel: '将至信详情',
+      accessibilityLabel: '轻触火漆印开启',
     }),
   ).toBeTruthy();
   expect(
-    arrivingRenderer.root.findByProps({ children: '有信将至' }),
+    arrivingRenderer.root.findByProps({ children: '轻触「渡」印拆信' }),
   ).toBeTruthy();
+  await ReactTestRenderer.act(async () => {
+    arrivingRenderer.root
+      .findAllByProps({ accessibilityLabel: '返回信箱' })[0]
+      .props.onPress();
+    await Promise.resolve();
+  });
   expect(
-    arrivingRenderer.root.findByProps({ children: '火漆尚温，宜静候' }),
+    arrivingRenderer.root.findByProps({ accessibilityLabel: '信' }),
   ).toBeTruthy();
   await ReactTestRenderer.act(() => arrivingRenderer.unmount());
 
@@ -674,6 +686,7 @@ test('renders distinct prototype sheets for traveling and arriving letters', asy
     opened: [],
     tomorrowCount: 0,
   });
+  getLetterDetailMock.mockRejectedValue(new Error('没有可拆的信'));
 });
 
 test('enables the daily reminder with the prototype inline time picker', async () => {

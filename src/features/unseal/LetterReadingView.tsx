@@ -58,9 +58,7 @@ export function LetterReadingView({
 }: LetterReadingViewProps) {
   const isReply = item.letter.status === 'reply';
   const paragraphs = splitLetter(item.memory.content);
-  const hasWrittenSalutation = startsWithLetterSalutation(
-    item.memory.content,
-  );
+  const hasWrittenSalutation = startsWithLetterSalutation(item.memory.content);
   const hasPhoto = Boolean(item.memory.imagePath || item.memory.photoTone);
   const [ruleCount, setRuleCount] = useState(LETTER_MIN_RULES);
 
@@ -78,7 +76,6 @@ export function LetterReadingView({
             { opacity: pressed ? 0.5 : 1 },
           ]}
         >
-          <Text style={styles.backGlyph}>‹</Text>
           <Text style={styles.backLabel}>收回</Text>
         </Pressable>
         <Text style={styles.toolbarTitle}>{isReply ? '回信' : '原信'}</Text>
@@ -210,34 +207,26 @@ export function LetterReadingView({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: detailColors.note },
   toolbar: {
-    minHeight: 52,
+    height: 74,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.page,
     zIndex: 50,
     elevation: 8,
   },
   backButton: {
-    minWidth: 88,
-    minHeight: 48,
-    flexDirection: 'row',
+    minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
-    paddingHorizontal: spacing.sm,
+    justifyContent: 'center',
     zIndex: 51,
     elevation: 9,
-  },
-  backGlyph: {
-    color: detailColors.ink,
-    marginTop: -2,
-    fontFamily: fontFamilies.sans,
-    fontSize: 30,
-    lineHeight: 32,
   },
   backLabel: {
     color: detailColors.inkSoft,
     fontFamily: fontFamilies.serif,
-    fontSize: fontSizes.meta,
+    fontSize: 13,
   },
   toolbarTitle: {
     color: detailColors.inkLight,
@@ -245,7 +234,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.caption,
     letterSpacing: 3,
   },
-  toolbarBalance: { width: 88 },
+  toolbarBalance: { width: 44 },
   content: {
     flexGrow: 1,
     width: '100%',
