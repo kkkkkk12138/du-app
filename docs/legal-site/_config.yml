@@ -1,0 +1,8 @@
+title: 渡
+description: 渡 App 官方隐私政策、服务条款与使用支持
+lang: zh-CN
+theme: minima
+header_pages:
+  - privacy/index.md
+  - terms/index.md
+  - support/index.md

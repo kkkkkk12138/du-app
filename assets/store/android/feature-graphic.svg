@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fffaf2"/>
+      <stop offset="1" stop-color="#f1e7d7"/>
+    </linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#6f2a20" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="500" fill="url(#paper)"/>
+  <path d="M0 421C193 387 347 450 529 429C707 409 847 351 1024 374V500H0Z" fill="#eadbc7" opacity=".55"/>
+  <g transform="rotate(-3 235 250)" filter="url(#shadow)">
+    <rect x="95" y="110" width="280" height="280" rx="36" fill="#c93a2c"/>
+    <rect x="104" y="119" width="262" height="262" rx="29" fill="none" stroke="#aa2f25" stroke-width="3" opacity=".5"/>
+    <text
+      x="235"
+      y="309"
+      fill="#fff9ef"
+      font-family="Noto Serif CJK SC, Songti SC, STSong, serif"
+      font-size="170"
+      font-weight="500"
+      text-anchor="middle"
+    >渡</text>
+  </g>
+  <text
+    x="455"
+    y="219"
+    fill="#4d4037"
+    font-family="Noto Serif CJK SC, Songti SC, STSong, serif"
+    font-size="68"
+    font-weight="500"
+  >把此刻落下</text>
+  <text
+    x="458"
+    y="290"
+    fill="#8a796c"
+    font-family="Noto Serif CJK SC, Songti SC, STSong, serif"
+    font-size="31"
+    letter-spacing="4"
+  >等时间寄回来</text>
+  <line x1="458" y1="331" x2="827" y2="331" stroke="#c93a2c" stroke-width="3" opacity=".65"/>
+</svg>
