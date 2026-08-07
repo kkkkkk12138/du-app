@@ -2,7 +2,7 @@
 
 适用对象：第一次使用 GitHub，并计划以个人开发者身份发布“渡”的项目所有者。
 
-文档版本：2026-08-06
+文档版本：2026-08-07
 
 这份手册解释当前账号和代码状态，并按实际发布顺序说明源码、签名材料、商店资料和安装包分别交到哪里。平台页面和政策会变化；涉及费用、身份验证、测试人数和备案要求时，以提交当天的官方控制台为准。
 
@@ -70,33 +70,23 @@ prototype  https://github.com/kkkkkk12138/DU.git
 
 远端目前有两条重要分支：
 
-| 分支                                  | 当前提交  | 含义                               |
-| ------------------------------------- | --------- | ---------------------------------- |
-| `main`                                | `90e05aa` | 当前默认稳定分支，但不是最新代码   |
-| `codex/prepare-ios-app-store-release` | `cc0369e` | 包含最新双端文字、城市和数据库修复 |
+| 分支                                  | 含义             |
+| ------------------------------------- | ---------------- |
+| `main`                                | 当前远端稳定分支 |
+| `codex/prepare-ios-app-store-release` | 当前发布准备分支 |
 
-当前本地工作分支与远端 `codex/prepare-ios-app-store-release` 已同步。`[Data-backed]`
-
-因此，现阶段下载或构建最新版时必须选择：
-
-```text
-codex/prepare-ios-app-store-release
-```
-
-直接从 GitHub 默认打开或下载 `main` 会得到较旧版本。`[Data-backed]`
+本次发布准备完成后，两条远端分支保持在同一提交。已有 `v1.0.1` 标签不移动；后续正式候选版本使用新标签。`[Expert judgment]`
 
 ### 发布前的分支处理建议
 
-完成双端验收后，应把发布分支合并到 `main`，再从 `main` 创建版本标签。`[Expert judgment]`
-
-建议发布记录：
+当前发布记录：
 
 ```text
 main
-└── v1.0.0
+└── v1.0.1
 ```
 
-不要在仍有未验收问题时提前合并或打标签。标签表示一个可以重新构建、定位和回滚的正式版本，不是普通进度标记。`[Expert judgment]`
+后续发布配置或安装包发生变化时创建新提交和新标签，不移动已有 `v1.0.1`。标签表示一个可以重新构建、定位和回滚的版本，不是普通进度标记。`[Expert judgment]`
 
 ## GitHub 中几个词分别是什么意思
 
@@ -132,7 +122,7 @@ Pull Request，简称 PR，是把一个分支合并到另一个分支前的审�
 
 ### Release 与 Tag
 
-Tag 是指向固定提交的版本标记，例如 `v1.0.0`。GitHub Release 是围绕 Tag 写的发布说明。移动应用商店不要求必须创建 GitHub Release，但使用 Tag 能让后续维护更可靠。`[Expert judgment]`
+Tag 是指向固定提交的版本标记，例如当前的 `v1.0.1`。GitHub Release 是围绕 Tag 写的发布说明。移动应用商店不要求必须创建 GitHub Release，但使用 Tag 能让后续维护更可靠。`[Expert judgment]`
 
 ## GitHub 应该保存什么
 
@@ -233,17 +223,17 @@ git push origin <当前分支>
 | -------------------------- | -------------------------------------------------- |
 | App 中文名                 | 渡                                                 |
 | iOS 正式 Bundle ID         | `[To be confirmed]`，当前仍是 React Native 示例 ID |
-| Android 正式 applicationId | `[To be confirmed]`，当前默认 `com.duapp`          |
-| Apple 开发者主体           | `[To be confirmed]`，建议个人主体                  |
+| Android 正式 applicationId | `com.duapp`                                        |
+| Apple 开发者主体           | 周颖，个人主体                                     |
 | Google Play 开发者主体     | `[To be confirmed]`，建议个人主体                  |
-| 对外支持邮箱               | `[To be confirmed]`                                |
-| 隐私政策主体姓名           | `[To be confirmed]`                                |
+| 对外支持邮箱               | `2161511899@qq.com`                                |
+| 隐私政策主体姓名           | 周颖                                               |
 | 首发国家和地区             | `[To be confirmed]`                                |
 | 是否首发中国大陆           | `[To be confirmed]`                                |
-| 最终应用图标               | `[To be confirmed]`                                |
-| 对外隐私政策 URL           | `[To be confirmed]`                                |
-| 对外服务条款 URL           | `[To be confirmed]`                                |
-| 对外支持页面 URL           | `[To be confirmed]`                                |
+| 最终应用图标               | Android 与 iOS 母版已生成                          |
+| 对外隐私政策 URL           | `https://kkkkkk12138.github.io/du-legal/privacy/`  |
+| 对外服务条款 URL           | `https://kkkkkk12138.github.io/du-legal/terms/`    |
+| 对外支持页面 URL           | `https://kkkkkk12138.github.io/du-legal/support/`  |
 
 iOS 当前 Bundle ID 是：
 
@@ -271,29 +261,19 @@ docs/app-store/SUPPORT.md
 
 商店需要的是任何人无需登录即可打开的 HTTPS 网页，不是本机 Markdown 文件，也不是私有 GitHub 文件链接。`[Expert judgment]`
 
-GitHub 官方说明：GitHub Free 只支持从公开仓库使用 Pages；私有仓库使用 Pages 需要 GitHub Pro、Team 或 Enterprise。即便源仓库私有，发布出来的普通 Pages 网站仍可能公开。`[Research-backed]`
-
-低成本方案有两种：
-
-### 方案 A：单独创建公开政策仓库
-
-创建一个只放隐私政策、条款和支持页面的公开仓库，例如：
+当前已采用独立公开政策仓库：
 
 ```text
-du-legal
+https://github.com/kkkkkk12138/du-legal
 ```
 
-只复制公开文档，不复制应用源码、密钥或内部路线图。启用 GitHub Pages 后得到公开 HTTPS URL。
+主页、隐私政策、服务条款和支持页面均已匿名验证可访问。公开仓库只保存公开文本，不保存应用源码、手机号、证件、密钥或用户数据。`[Data-backed]`
 
-优点：GitHub Free 可用，维护成本低。`[Research-backed]`
-
-缺点：法定姓名、联系邮箱和政策内容会公开，这是商店合规页面的正常属性。`[Expert judgment]`
-
-### 方案 B：购买域名并使用静态托管
+### 后续迁移到备案域名
 
 将政策页面部署到本人长期控制的域名。准备中国大陆发布或账号云同步时，这种方案更容易与备案、支持页面和注销页面统一。`[Expert judgment]`
 
-首发只上架境外 App Store 和 Google Play 时，方案 A 成本更低。计划尽快进入中国大陆渠道时，优先方案 B。`[Expert judgment]`
+接入商或国内商店明确要求境内域名和网络资源时，再迁移政策页面；不能填写虚构域名、IP 或服务器。`[Expert judgment]`
 
 ## iOS 发布到 App Store
 
@@ -357,9 +337,10 @@ https://developer.apple.com/programs/enroll/
 1. 正式 Bundle ID 尚未确定。`[Data-backed]`
 2. Xcode 仍使用示例 Bundle ID。`[Data-backed]`
 3. Apple Developer Team 和发布签名需要本人账号配置。`[To be confirmed]`
-4. 正式 AppIcon 需要最终确认。`[To be confirmed]`
-5. 三个公开 HTTPS 页面尚未提供最终 URL。`[To be confirmed]`
-6. 必须完成真机与 TestFlight 验收。`[Expert judgment]`
+4. 正式 AppIcon 已接入，仍需真机确认显示效果。`[Data-backed]`
+5. 公开 HTTPS 页面已上线并验证。`[Data-backed]`
+6. App Store Connect 记录尚未创建。`[To be confirmed]`
+7. 必须完成真机与 TestFlight 验收。`[Expert judgment]`
 
 ### iOS 正式顺序
 
@@ -367,19 +348,18 @@ https://developer.apple.com/programs/enroll/
 2. 确定正式 Bundle ID。
 3. 在 Apple Developer Portal 注册 Bundle ID。
 4. 在 Xcode 选择 Team 并修改 Bundle Identifier。
-5. 补齐 AppIcon。
-6. 创建公开政策页面。
-7. 在 App Store Connect 新建“渡”。
-8. 填写 `docs/app-store/APP_STORE_METADATA.md`。
-9. 用真实 iPhone 完整验收。
-10. 在 Xcode 生成 Release Archive。
-11. 执行 Validate App。
-12. 上传 App Store Connect。
-13. 从 TestFlight 安装并复验。
-14. 选择已验收的 Build。
-15. 完成隐私、分级、出口合规、价格和地区。
-16. 选择手动发布并提交审核。
-17. 审核通过后再次核对页面，再手动发布。
+5. 在 App Store Connect 新建“渡”。
+6. 填写 `docs/app-store/APP_STORE_METADATA.md`。
+7. 确认 AppIcon 真机效果。
+8. 用真实 iPhone 完整验收。
+9. 在 Xcode 生成 Release Archive。
+10. 执行 Validate App。
+11. 上传 App Store Connect。
+12. 从 TestFlight 安装并复验。
+13. 选择已验收的 Build。
+14. 完成隐私、分级、出口合规、价格和地区。
+15. 选择手动发布并提交审核。
+16. 审核通过后再次核对页面，再手动发布。
 
 预期结果：App Store Connect 中版本状态变为可供销售，用户可从所选地区的 App Store 下载。
 
@@ -488,9 +468,7 @@ docs/ANDROID_CHINA_STORES_LAUNCH.md
 
 ### 当前不建议立即提交大陆商店
 
-当前仍缺正式包名、公开域名与政策页面、APP 备案、软著准备、真实安卓设备验收以及逐平台个人主体确认。`[Data-backed]`
-
-优先完成 iOS 和 Google Play，可以先验证产品稳定性，同时避免在合规基础设施未确定时重复投递多个渠道。`[Expert judgment]`
+正式包名、签名候选包、图标、宣传图、政策页面、备案预填材料和软著申请材料已准备。当前仍缺 APP 备案审批、软著电子证书、真实 Android 设备验收、商店截图以及逐平台个人主体确认。`[Data-backed]`
 
 ## 软件著作权应准备什么
 
@@ -531,7 +509,7 @@ https://www.ccopyright.com.cn/
 
 ### iOS 素材
 
-- 1024 × 1024 App 图标
+- 1024 × 1024 无透明通道 App 图标（已生成）
 - App Store Connect 当前接受尺寸的 iPhone 截图
 - 若声明支持 iPad，则准备对应 iPad 截图
 - TestFlight Beta 描述和反馈邮箱
@@ -561,7 +539,7 @@ https://www.ccopyright.com.cn/
 
 - Apple Developer Program：每年 99 美元标准价，地区价格可能不同。`[Research-backed]`
 - Google Play Console：一次性 25 美元注册费。`[Research-backed]`
-- 中国大陆渠道：账号费、备案、服务器、域名和资质成本依渠道与方案而异。`[To be confirmed]`
+- 中国大陆渠道：首发应用价格设为免费；账号、备案、服务器、域名和资质成本依渠道与方案而异。`[To be confirmed]`
 
 以后收费建议通过应用内购买或订阅实现，不要把首版直接设为付费下载。这样可以保留免费获客路径，并为付费权益、恢复购买和订阅管理留出开发时间。`[Expert judgment]`
 
@@ -599,7 +577,7 @@ docs/ACCOUNT_SYNC_PLAN.md
 4. 在真实设备完成关键流程。
 5. 提交并推送到 GitHub。
 6. 审阅差异后合并到 `main`。
-7. 创建版本标签，例如 `v1.0.0`。
+7. 创建新版本标签，例如下一个版本使用 `v1.0.2`，不要移动已有标签。
 
 ### iOS 阶段
 
@@ -641,14 +619,12 @@ docs/ACCOUNT_SYNC_PLAN.md
 
 1. 登录 GitHub，核对邮箱、双重认证和恢复代码。
 2. 决定正式 iOS Bundle ID。
-3. 决定正式 Android applicationId。
-4. 开通或确认 Apple Developer Program。
-5. 开通或确认 Google Play Console。
-6. 提供长期支持邮箱。
-7. 确认是否首发中国大陆。
-8. 确认最终 App 图标。
-9. 选择公开政策页面方案。
-10. 在完成当前功能验收后，授权把发布分支合并到 `main` 并创建 `v1.0.0` 标签。
+3. 开通或确认 Apple Developer Program。
+4. 确认 iOS 是否首发中国大陆；备案前建议不选。
+5. 完成 APP 备案实名认证、人脸和短信核验。
+6. 完成软著实名认证、签章和提交。
+7. 用真实 Android 和 iPhone 完成最终验收。
+8. 在各商店完成个人开发者认证并确认类目准入。
 
 ## 应阅读的专业指导书
 

@@ -2,7 +2,9 @@
 
 适用对象：个人开发者首次发布免费 iPhone App，后续再通过 App 内购买提供增值功能。
 
-更新日期：2026-08-06
+适用版本：1.0.1（Build 2）
+
+更新日期：2026-08-07
 
 第一次使用 GitHub 或应用商店时，先阅读：
 
@@ -12,17 +14,27 @@ docs/PUBLISHING_MASTER_GUIDE.md
 
 ## 先看当前状态
 
-当前代码已完成 TypeScript、严格 ESLint、Jest 和 iOS Release Simulator 验证。发布前必须基于最终提交重新运行全部检查；模拟器构建不能替代真机归档、TestFlight 和 App Store 上传。
+当前代码已完成 TypeScript、严格 ESLint、Jest 和 iOS Release Simulator 验证。App 图标、隐私清单、权限说明、商店文案和公开政策页面已准备。发布前必须基于最终提交重新运行全部检查；模拟器构建不能替代真机归档、TestFlight 和 App Store 上传。
 
 目前仍有以下发布阻塞：
 
 1. Xcode 中的 Bundle ID 仍为 `org.reactjs.native.example.duapp`。
-2. `AppIcon.appiconset` 只有规格声明，没有正式图标文件。
-3. Xcode 尚未配置你的 Apple Developer Team 和 App Store 签名。
-4. 隐私政策、服务条款和支持页面尚未提供最终公开 HTTPS URL。
-5. 尚未完成真机和 TestFlight 最终验收。
+2. Xcode 尚未配置你的 Apple Developer Team 和 App Store 签名。
+3. 尚未在 App Store Connect 创建正式 App 记录。
+4. 尚未完成真机、Archive 和 TestFlight 最终验收。
+5. App Store 截图尚未从最终 Release 构建生成。
 
 完成这些事项前，不要提交正式审核。
+
+## 免费首发策略
+
+“免费上架”表示用户免费下载，不表示 Apple 开发者身份免费。发布到 App Store 仍需有效的 Apple Developer Program 会员，标准年费为 99 美元，实际人民币金额以 Apple 结算页面为准。
+
+1. App Store 价格选择免费。
+2. 1.0.1 不创建应用内购买、订阅、广告或付费按钮。
+3. 不签署只为收款所需的 Paid Apps Agreement，不填写收款银行账户，除非 App Store Connect 要求或后续开始收费。
+4. 不在描述、截图、审核说明和隐私政策中承诺未来收费功能。
+5. 后续收费优先通过 Apple 应用内购买实现，并在新版本中补齐购买、恢复购买、权益校验和退款说明。
 
 ## 1. 准备账户和资料
 
@@ -43,13 +55,13 @@ docs/PUBLISHING_MASTER_GUIDE.md
 | 项目             | 建议或待填写内容    |
 | ---------------- | ------------------- |
 | App 名称         | 渡                  |
-| 备用名称         | `[填写备用名称]`    |
-| 正式 Bundle ID   | `com.[个人标识].du` |
+| 备用名称         | 渡 · 写给未来       |
+| 正式 Bundle ID   | `[本人注册后填写]`  |
 | SKU              | `du-ios-001`        |
 | 主语言           | 简体中文            |
 | 主要类别         | 生活                |
 | 次要类别         | 效率                |
-| 支持邮箱         | `[填写长期邮箱]`    |
+| 支持邮箱         | `2161511899@qq.com` |
 | 是否首发中国大陆 | `[是 / 否]`         |
 
 Bundle ID 与 App、Keychain、通知、内购和后续升级绑定。正式创建后不要更换。
@@ -120,8 +132,8 @@ open duapp.xcworkspace
 6. 将 Bundle Identifier 改为正式 Bundle ID。
 7. 在 `General` 中确认：
    - Display Name：`渡`
-   - Version：`1.0.0`
-   - Build：`1`
+   - Version：`1.0.1`
+   - Build：`2`
    - Deployment Target：与你准备支持的最低 iOS 版本一致
 8. 在 `Capabilities` 中核对通知与 Keychain 能力，不添加未使用的能力。
 
@@ -129,14 +141,17 @@ open duapp.xcworkspace
 
 ## 5. 补齐正式图标和启动资源
 
-当前 AppIcon 尚未包含正式图片，这是上传阻塞项。
+仓库已生成无透明通道的 iOS 图标母版和完整 iPhone 图标槽位：
 
-1. 准备一张 1024 × 1024 像素的正方形 PNG。
-2. 图标不得包含透明通道。
-3. 打开 `ios/duapp/Images.xcassets`。
-4. 选择 `AppIcon`。
-5. 将图标拖入 Xcode 当前要求的所有槽位，至少补齐 App Store 1024 × 1024 图标。
-6. 用真机和浅色、深色主屏幕检查辨识度。
+```text
+assets/store/ios/app-icon-1024.png
+ios/duapp/Images.xcassets/AppIcon.appiconset/
+```
+
+1. 打开 `ios/duapp/Images.xcassets`。
+2. 选择 `AppIcon`，确认所有 iPhone 槽位均显示图片。
+3. 在 Xcode Build Log 中确认没有 AppIcon 缺失或透明通道错误。
+4. 用真机和浅色、深色主屏幕检查辨识度。
 
 不要把截图、圆角蒙版或 Apple 设备外框直接做进 App 图标。
 
@@ -144,26 +159,15 @@ open duapp.xcworkspace
 
 ## 6. 发布隐私政策、服务条款和支持页面
 
-App Store Connect 要求所有 App 提供公开可访问的隐私政策 URL。仓库已提供：
+App Store Connect 要求所有 App 提供公开可访问的隐私政策 URL。以下页面已上线并通过匿名 HTTPS 验证：
 
-- `docs/app-store/PRIVACY_POLICY.md`
-- `docs/app-store/TERMS_OF_SERVICE.md`
-- `docs/app-store/SUPPORT.md`
+- 隐私政策：<https://kkkkkk12138.github.io/du-legal/privacy/>
+- 服务条款：<https://kkkkkk12138.github.io/du-legal/terms/>
+- 使用支持：<https://kkkkkk12138.github.io/du-legal/support/>
 
 ### 低成本发布方式
 
-当前源码仓库是私有仓库。GitHub Free 只能从公开仓库使用 GitHub Pages；从私有仓库使用 Pages 需要 GitHub Pro、Team 或 Enterprise。不要为了发布政策页面把整个源码仓库改成公开。
-
-建议单独建立一个公开仓库，例如 `du-legal`，只放隐私政策、服务条款和支持页面：
-
-1. 先把模板中的 `[待填写]` 全部替换为真实信息。
-2. 只复制三个公开文档，不复制应用源码、内部路线图、密钥或用户数据。
-3. 在公开政策仓库打开 `Settings > Pages`。
-4. 选择 `Deploy from a branch`。
-5. 选择发布分支和目录。
-6. 保存并等待部署完成。
-7. 在退出 GitHub 登录的浏览器中打开三个页面。
-8. 把最终 HTTPS URL 记录到 `APP_STORE_METADATA.md`。
+源码继续保存在私有 `du-app`；公开政策单独保存在 `du-legal`。不要把源码仓库改为公开，也不要把手机号、证件、签名文件、备份或用户数据复制到政策仓库。
 
 若计划进入中国大陆商店或提供账号同步，优先使用本人长期控制的域名和合规托管方案。
 
@@ -181,7 +185,7 @@ App Store Connect 要求所有 App 提供公开可访问的隐私政策 URL。�
 
 若首发包含中国大陆，需要按适用流程完成 APP 备案。材料和办理入口会随接入服务商、地区及政策变化，提交前以工信部和接入服务商当时要求为准。
 
-若暂未完成备案：
+当前备案编号尚未取得。若先发布 iOS：
 
 1. 在 App Store Connect 的销售地区中取消中国大陆。
 2. 先选择其他计划发布的国家或地区。
@@ -221,7 +225,7 @@ Apple 官方操作页：<https://developer.apple.com/cn/help/app-store-connect/c
 5. App 版权信息。
 6. App Privacy。
 7. 审核联系人和审核说明。
-8. 价格设为免费。
+8. 价格设为免费，不创建应用内购买。
 9. 销售地区。
 
 ### App Privacy 的保守申报原则
@@ -237,7 +241,7 @@ Apple 官方 App Privacy 说明：<https://developer.apple.com/cn/help/app-store
 
 ## 10. 准备 App Store 截图
 
-Apple 当前要求每组上传 1 到 10 张 JPG 或 PNG 截图。iPhone 6.9 英寸截图可使用 Apple 列出的有效尺寸，例如 1320 × 2868、1290 × 2796 或 1260 × 2736 像素。
+截图尺寸和设备组以 App Store Connect 当前上传框为准。每组只上传来自最终 Release 构建的 JPG 或 PNG，不用设计稿冒充真实界面。
 
 推荐准备 6 张竖屏截图：
 
@@ -392,16 +396,19 @@ Apple 官方上传说明：<https://developer.apple.com/cn/help/app-store-connec
 
 不要在代码中出现尚未完成的付费按钮或虚假价格。
 
-## 19. 你需要提供给开发侧的信息
+## 19. 本人必须完成的操作
 
-在下一轮发布配置中提供：
+以下操作涉及付款、法定身份、双重认证、协议和发布决定，必须由周颖本人完成：
 
-1. Apple Developer Program 已开通状态。
-2. 正式 Bundle ID。
-3. Apple Developer Team ID。
-4. 最终 1024 × 1024 App 图标。
-5. 支持邮箱。
-6. 隐私政策、服务条款和支持页面 URL。
-7. 是否首发中国大陆。
-8. App Store 名称和备用名称。
-9. 用于真机和 TestFlight 的 Apple Account 邮箱。
+1. 开通并续费 Apple Developer Program。
+2. 在 Developer Portal 注册正式 Bundle ID。
+3. 提供 Apple Developer Team ID，并在 Xcode 选择个人 Team。
+4. 在 App Store Connect 创建“渡”并接受适用协议。
+5. 决定首发国家或地区；备案前不选择中国大陆。
+6. 在真机和 TestFlight 上完成最终验收。
+7. 确认 App Privacy、年龄分级、出口合规和免费价格。
+8. 点击“提交以供审核”，审核通过后确认手动发布。
+
+Apple Account 密码、双重认证验证码、证书私钥和 App Store Connect API 私钥不得写入仓库或发送到普通聊天。
+
+开发侧已完成图标、公开政策 URL、商店文案、审核路径、隐私清单、权限说明和版本配置准备。取得正式 Bundle ID 与 Team ID 后，再完成 Xcode 身份替换、签名 Archive 和上传。

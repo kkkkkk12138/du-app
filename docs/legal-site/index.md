@@ -24,6 +24,6 @@ Android 包名：`com.duapp`
 
 联系邮箱：2161511899@qq.com
 
-APP 备案编号：`[取得备案后填写]`
+APP 备案状态：备案编号尚未取得，取得后将在此公布。
 
 [查询 APP 备案](https://beian.miit.gov.cn/)

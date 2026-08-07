@@ -27,11 +27,11 @@
 | 开发者主体 | 周颖 | 已填写 |
 | 支持邮箱 | `2161511899@qq.com` | 已填写 |
 | 联系电话 | `18761222187` | 私有申报使用 |
-| 隐私政策 URL | `https://kkkkkk12138.github.io/du-legal/privacy/` | 待 Pages 发布验证 |
-| 服务条款 URL | `https://kkkkkk12138.github.io/du-legal/terms/` | 待 Pages 发布验证 |
-| 支持页面 URL | `https://kkkkkk12138.github.io/du-legal/support/` | 待 Pages 发布验证 |
-| APP 备案号 | `[取得后填写]` | 尚未办理 |
-| 软件著作权登记号 | `[取得后填写]` | 尚未办理 |
+| 隐私政策 URL | `https://kkkkkk12138.github.io/du-legal/privacy/` | 已上线并验证 |
+| 服务条款 URL | `https://kkkkkk12138.github.io/du-legal/terms/` | 已上线并验证 |
+| 支持页面 URL | `https://kkkkkk12138.github.io/du-legal/support/` | 已上线并验证 |
+| APP 备案号 | 尚未取得，审批通过后回填真实编号 | 尚未办理 |
+| 软件著作权登记号 | 尚未取得，审批通过后回填真实编号 | 尚未办理 |
 
 应用已生成独立生产上传证书。证书、JKS 文件和密码只保存在发布机器，不进入 GitHub。
 
@@ -75,7 +75,7 @@ android/keystore.properties
 国内 Android 厂商商店通常接收生产签名 APK：
 
 ```text
-android/app/build/outputs/apk/release/app-release.apk
+/Users/bytedance/Documents/DU-App-Releases/1.0.1-android-cn-rc1/du-1.0.1-android-cn-rc1.apk
 ```
 
 2026-08-07 最终候选文件 SHA-256：
@@ -91,7 +91,7 @@ android/app/build/outputs/apk/release/app-release.apk
 Google Play 接收 AAB：
 
 ```text
-android/app/build/outputs/bundle/release/app-release.aab
+/Users/bytedance/Documents/DU-App-Releases/1.0.1-android-cn-rc1/du-1.0.1-android-cn-rc1.aab
 ```
 
 2026-08-07 最终候选文件 SHA-256：
@@ -299,7 +299,7 @@ APP 备案的提交入口、字段和核验流程由接入服务商及当时政�
 | 政策站点 | `https://kkkkkk12138.github.io/du-legal/` |
 | 隐私政策 URL | `https://kkkkkk12138.github.io/du-legal/privacy/` |
 | 服务条款 URL | `https://kkkkkk12138.github.io/du-legal/terms/` |
-| 备案号 | `[审批后填写]` |
+| 备案号 | 尚未取得，审批通过后回填真实编号 |
 
 若备案系统要求签名 MD5、SHA-1、公钥或 APK 摘要，应从本次最终 APK 重新导出，不使用截图中的旧值。
 
@@ -348,14 +348,16 @@ APP 备案的提交入口、字段和核验流程由接入服务商及当时政�
 
 ## 提交前由本人补齐
 
-1. 填写本人法定姓名、身份证明、实名手机号和长期邮箱。
-2. 决定并购买长期使用的域名。
-3. 发布隐私政策、服务条款、支持和账号注销说明页面。
-4. 完成 APP 备案并取得备案号。
-5. 申请软件著作权或确认目标商店是否接受当前权利材料。
-6. 在目标商店完成个人开发者实名认证。
-7. 逐个平台确认“生活/实用工具”类目是否接受个人主体。
+1. 在接入商备案后台填写身份证明、住址和平台要求的网络资源。
+2. 完成人脸、短信、承诺书或电子签署等备案核验。
+3. 完成 APP 备案并取得备案号。
+4. 提交软件著作权申请并取得电子证书。
+5. 在目标商店完成个人开发者实名认证。
+6. 逐个平台确认“生活/实用工具”类目是否接受个人主体。
+7. 用真实 Android 设备完成 Release 回归。
 8. 准备无私人数据的真实 Android Release 截图。
+
+公开政策页面、支持邮箱、正式包名、签名候选包、图标、宣传图、权限说明和统一商店文案已经准备完成。
 
 ## 开发侧复核状态
 

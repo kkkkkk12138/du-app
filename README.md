@@ -2,7 +2,7 @@
 
 “渡”是一款本地优先的日记与未来信应用，使用 React Native、WatermelonDB 以及 iOS、Android 原生能力构建。
 
-当前发布优先级为 iOS，其次为 Android。两个平台共用业务与数据层，平台密钥和商店凭据只保存在发布机器。
+当前发布优先级为中国大陆 Android 商店，其次为 iOS App Store 免费首发。两个平台共用业务与数据层，平台密钥和商店凭据只保存在发布机器。
 
 第一次接触 GitHub 或应用商店时，先阅读 [GitHub 与应用商店发布总指导书](docs/PUBLISHING_MASTER_GUIDE.md)。其中说明当前账号、仓库和分支状态，以及源码、凭据、安装包和商店资料分别应提交到哪里。
 
@@ -52,8 +52,8 @@ npx eslint . --max-warnings=0
 
 1. 将示例 Bundle ID 改为正式且长期不变的 Bundle ID。
 2. 在 Xcode 中选择有效的 Apple Developer Team。
-3. 补齐 `AppIcon.appiconset` 的正式图标文件。
-4. 将公开隐私政策、服务条款和支持页面 URL 填入 App Store Connect。
+3. 在真机确认已接入的 `AppIcon.appiconset` 图标。
+4. 将仓库已验证的公开隐私政策、服务条款和支持页面 URL 填入 App Store Connect。
 
 逐步操作见 [iOS App Store 上架指导书](docs/IOS_PERSONAL_DEVELOPER_LAUNCH.md)。
 
@@ -77,6 +77,8 @@ cd android
 Release 签名从被 Git 忽略的 `android/keystore.properties` 读取，绝不能改回 debug 签名。逐步操作见 [Android Google Play 上架指导书](docs/ANDROID_GOOGLE_PLAY_LAUNCH.md)。
 
 Google Play 资料草稿见 [商店资料模板](docs/google-play/PLAY_STORE_METADATA.md) 和 [数据安全草稿](docs/google-play/DATA_SAFETY.md)。
+
+中国大陆厂商商店发布见 [中国大陆 Android 上架指导书](docs/ANDROID_CHINA_STORES_LAUNCH.md) 和 [申报准备手册](docs/android-cn/STORE_SUBMISSION_PREPARATION.md)。
 
 ## 数据与安全
 

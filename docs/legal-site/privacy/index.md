@@ -116,7 +116,7 @@ permalink: /privacy/
 
 ## 备案信息
 
-APP 备案编号：`[取得备案后填写]`
+APP 备案状态：备案编号尚未取得，取得后将在此公布。
 
 备案查询：<https://beian.miit.gov.cn/>
 
