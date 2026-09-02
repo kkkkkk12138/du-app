@@ -2,7 +2,9 @@ import {
   calculateMediaCheckout,
   calculateMediaUnits,
   FREE_MEDIA_BYTES,
+  recommendCreditProduct,
   type CheckoutMediaItem,
+  type CreditProduct,
 } from '../src/features/billing/mediaCheckout';
 
 describe('calculateMediaUnits', () => {
@@ -48,6 +50,34 @@ describe('calculateMediaUnits', () => {
         bytes: 1,
       }),
     ).toThrow('录音缺少有效时长');
+  });
+});
+
+const products: CreditProduct[] = [
+  {id: 'credit_1', credits: 1, priceMinor: 100},
+  {id: 'credit_5', credits: 5, priceMinor: 400},
+  {id: 'credit_10', credits: 10, priceMinor: 600},
+  {id: 'credit_20', credits: 20, priceMinor: 1000},
+];
+
+describe('recommendCreditProduct', () => {
+  test.each([
+    [1, 'credit_1'],
+    [3, 'credit_5'],
+    [7, 'credit_10'],
+    [16, 'credit_20'],
+  ])('recommends a product covering %i missing units', (missing, expected) => {
+    expect(recommendCreditProduct(missing, products)?.id).toBe(expected);
+  });
+
+  test('returns undefined when no purchase is required', () => {
+    expect(recommendCreditProduct(0, products)).toBeUndefined();
+  });
+
+  test('rejects a shortage larger than the available products', () => {
+    expect(() => recommendCreditProduct(21, products)).toThrow(
+      '没有可覆盖本次内容的媒体额度商品',
+    );
   });
 });
 

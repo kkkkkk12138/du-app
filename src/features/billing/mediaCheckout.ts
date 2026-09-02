@@ -20,6 +20,12 @@ export type MediaCheckoutQuote = {
   remainingFreeBytes: number;
 };
 
+export type CreditProduct = {
+  id: string;
+  credits: number;
+  priceMinor: number;
+};
+
 export const FREE_MEDIA_BYTES = 500 * 1024 * 1024;
 
 const LONG_AUDIO_THRESHOLD_SECONDS = 15 * 60;
@@ -77,4 +83,23 @@ export function calculateMediaCheckout({
     missingUnits: totalUnits - coveredUnits,
     remainingFreeBytes: freeBytes,
   };
+}
+
+export function recommendCreditProduct(
+  missingUnits: number,
+  products: CreditProduct[],
+) {
+  if (missingUnits <= 0) {
+    return undefined;
+  }
+  const product = [...products]
+    .filter(item => item.credits >= missingUnits)
+    .sort(
+      (left, right) =>
+        left.credits - right.credits || left.priceMinor - right.priceMinor,
+    )[0];
+  if (!product) {
+    throw new Error('没有可覆盖本次内容的媒体额度商品');
+  }
+  return product;
 }
