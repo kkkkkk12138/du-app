@@ -15,6 +15,13 @@ const keyRecoveryMigrationPath = path.join(
   'migrations',
   '20260904070000_decouple_auth_and_key_recovery.sql',
 );
+const reservedBytesMigrationPath = path.join(
+  __dirname,
+  '..',
+  'cloudbase',
+  'migrations',
+  '20260904071000_add_reserved_media_bytes.sql',
+);
 const migrationsDirectory = path.dirname(migrationPath);
 
 describe('CloudBase account, sync, and billing schema', () => {
@@ -106,5 +113,17 @@ describe('CloudBase account, sync, and billing schema', () => {
     );
     expect(sql).toContain('key_transfer_policy');
     expect(sql).toContain("'device_or_recovery'");
+  });
+
+  test('tracks reserved bytes before media uploads are confirmed', () => {
+    const sql = fs.readFileSync(reservedBytesMigrationPath, 'utf8');
+
+    expect(sql).toContain(
+      'reserved_free_bytes bigint NOT NULL DEFAULT 0',
+    );
+    expect(sql).toContain(
+      'free_media_used_bytes + reserved_free_bytes <= free_media_limit_bytes',
+    );
+    expect(sql).toContain("'allocating'");
   });
 });
