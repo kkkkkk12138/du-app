@@ -8,6 +8,13 @@ const migrationPath = path.join(
   'migrations',
   '20260904034629_create_account_sync_billing.sql',
 );
+const keyRecoveryMigrationPath = path.join(
+  __dirname,
+  '..',
+  'cloudbase',
+  'migrations',
+  '20260904070000_decouple_auth_and_key_recovery.sql',
+);
 const migrationsDirectory = path.dirname(migrationPath);
 
 describe('CloudBase account, sync, and billing schema', () => {
@@ -87,5 +94,17 @@ describe('CloudBase account, sync, and billing schema', () => {
     expect(sql).toMatch(
       /GRANT USAGE, SELECT ON SEQUENCE public\.sync_records_id_seq TO authenticated/i,
     );
+  });
+
+  test('supports provider-independent key recovery', () => {
+    const sql = fs.readFileSync(keyRecoveryMigrationPath, 'utf8');
+
+    expect(sql).toContain('ALTER COLUMN password_salt DROP NOT NULL');
+    expect(sql).toContain('ALTER COLUMN password_kdf DROP NOT NULL');
+    expect(sql).toContain(
+      'ALTER COLUMN password_wrapped_key DROP NOT NULL',
+    );
+    expect(sql).toContain('key_transfer_policy');
+    expect(sql).toContain("'device_or_recovery'");
   });
 });
