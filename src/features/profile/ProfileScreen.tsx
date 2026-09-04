@@ -279,6 +279,51 @@ export function ProfileScreen() {
           <View style={[styles.heroRule, { borderBottomColor: colors.line }]} />
         </View>
 
+        <View
+          style={[
+            styles.accountNotice,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.line,
+            },
+          ]}
+        >
+          <View style={styles.accountHeading}>
+            <View
+              style={[
+                styles.accountStatusDot,
+                { backgroundColor: colors.textFaint },
+              ]}
+            />
+            <Text style={[styles.accountState, { color: colors.textMuted }]}>
+              未注册
+            </Text>
+          </View>
+          <Text
+            accessibilityLabel="未注册，内容只保存在本机"
+            style={[styles.accountTitle, { color: colors.text }]}
+          >
+            内容只保存在本机
+          </Text>
+          <Text style={[styles.accountDetail, { color: colors.textSoft }]}>
+            更换手机后，旧内容不会出现在新设备；删除应用或设备损坏后，内容无法恢复。
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="备份与恢复"
+            onPress={() => navigation.navigate('DataPrivacy')}
+            style={({ pressed }) => [
+              styles.accountAction,
+              { borderTopColor: colors.line, opacity: pressed ? 0.64 : 1 },
+            ]}
+          >
+            <Text style={[styles.accountActionText, { color: colors.accent }]}>
+              备份与恢复
+            </Text>
+            <Chevron />
+          </Pressable>
+        </View>
+
         <View style={styles.stamps}>
           <StatStamp
             label="信·已拆"
@@ -674,6 +719,51 @@ const styles = StyleSheet.create({
     marginTop: 24,
     borderBottomWidth: 0.5,
     borderStyle: 'dashed',
+  },
+  accountNotice: {
+    marginHorizontal: 28,
+    marginBottom: 22,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    borderWidth: 0.5,
+    borderRadius: 3,
+  },
+  accountHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  accountStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  accountState: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+  },
+  accountTitle: {
+    marginTop: 10,
+    fontFamily: fontFamilies.serifMedium,
+    fontSize: 17,
+  },
+  accountDetail: {
+    marginTop: 8,
+    paddingBottom: 16,
+    fontFamily: fontFamilies.serif,
+    fontSize: 13,
+    lineHeight: 23,
+  },
+  accountAction: {
+    minHeight: 46,
+    borderTopWidth: 0.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  accountActionText: {
+    flex: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
   },
   stamps: {
     paddingHorizontal: 28,

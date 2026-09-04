@@ -258,6 +258,25 @@ test('explains seeded reference content once during onboarding', async () => {
   await ReactTestRenderer.act(() => renderer.unmount());
 });
 
+test('states the local-only data loss risk before onboarding completes', async () => {
+  const renderer = await renderApp();
+
+  for (let index = 0; index < 3; index += 1) {
+    await ReactTestRenderer.act(() => {
+      renderer.root.findByProps({ accessibilityLabel: '继续' }).props.onPress();
+    });
+  }
+
+  expect(
+    renderer.root.findByProps({
+      children:
+        '不注册使用，内容只保存在这台设备。\n更换手机后，旧内容不会出现在新设备；删除应用或设备损坏后，内容无法恢复。',
+    }),
+  ).toBeTruthy();
+
+  await ReactTestRenderer.act(() => renderer.unmount());
+});
+
 test('opens the privacy policy before onboarding consent', async () => {
   const renderer = await renderApp();
 
@@ -318,6 +337,13 @@ test('switches all tabs and exposes the prototype profile settings', async () =>
   ).toBeTruthy();
   expect(
     renderer.root.findByProps({ accessibilityLabel: '深色外观' }),
+  ).toBeTruthy();
+  const localOnlyStatus = renderer.root.findByProps({
+    accessibilityLabel: '未注册，内容只保存在本机',
+  });
+  expect(localOnlyStatus.props.accessible).not.toBe(true);
+  expect(
+    renderer.root.findByProps({ accessibilityLabel: '备份与恢复' }),
   ).toBeTruthy();
   expect(
     renderer.root.findAllByProps({ accessibilityLabel: 'iCloud 备份' }),
