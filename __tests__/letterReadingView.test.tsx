@@ -55,7 +55,19 @@ test('uses the full screen as letter paper and keeps controls in the footer', as
   const contentStyle = StyleSheet.flatten(scroll.props.contentContainerStyle);
   expect(contentStyle.flexGrow).toBe(1);
   expect(contentStyle.paddingHorizontal).toBeUndefined();
-  expect(renderer.root.findByProps({ children: '收回' })).toBeTruthy();
+  expect(renderer.root.findByProps({ children: '收起' })).toBeTruthy();
+  const collapseControl = renderer.root.findByProps({
+    testID: 'letter-reading-collapse',
+  });
+  const collapseStyle = StyleSheet.flatten(
+    collapseControl.props.style({ pressed: false }),
+  );
+  expect(collapseControl.props.accessibilityLabel).toBe('返回信箱');
+  expect(collapseStyle.minWidth).toBe(44);
+  expect(collapseStyle.minHeight).toBe(44);
+  expect(collapseStyle.alignItems).toBe('flex-start');
+  expect(collapseStyle.justifyContent).toBe('center');
+  expect(collapseStyle.paddingHorizontal).toBeGreaterThan(0);
   expect(
     renderer.root.findByProps({ accessibilityLabel: '写封回信' }),
   ).toBeTruthy();

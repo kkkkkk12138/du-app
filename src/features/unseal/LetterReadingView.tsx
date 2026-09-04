@@ -72,12 +72,13 @@ export function LetterReadingView({
           accessibilityLabel={`返回${sourceLabel}`}
           hitSlop={12}
           onPress={onBack}
+          testID="letter-reading-collapse"
           style={({ pressed }) => [
             styles.backButton,
             { opacity: pressed ? 0.5 : 1 },
           ]}
         >
-          <Text style={styles.backLabel}>收回</Text>
+          <Text style={styles.backLabel}>收起</Text>
         </Pressable>
         <Text style={styles.toolbarTitle}>{isReply ? '回信' : '原信'}</Text>
         <View style={styles.toolbarBalance} />
@@ -208,26 +209,29 @@ export function LetterReadingView({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: detailColors.note },
   toolbar: {
-    height: 74,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.page,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.cardGap,
     zIndex: 50,
     elevation: 8,
   },
   backButton: {
     minWidth: 44,
     minHeight: 44,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
     zIndex: 51,
     elevation: 9,
   },
   backLabel: {
     color: detailColors.inkSoft,
-    fontFamily: fontFamilies.serif,
-    fontSize: 13,
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    letterSpacing: 1,
   },
   toolbarTitle: {
     color: detailColors.inkLight,
