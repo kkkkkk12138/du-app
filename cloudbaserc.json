@@ -6,6 +6,16 @@
   "functionRoot": "./functions",
   "functions": [
     {
+      "name": "media-reserve-upload",
+      "description": "Reserve free media capacity before encrypted COS uploads",
+      "type": "Event",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
+    },
+    {
       "name": "media-create-upload-ticket",
       "description": "Validate media reservations and issue short-lived COS PUT URLs",
       "type": "Event",
