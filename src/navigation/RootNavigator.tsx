@@ -12,6 +12,8 @@ import {
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { TabBar } from '../components/TabBar';
+import { AccountAccessScreen } from '../features/account/AccountAccessScreen';
+import { AccountScreen } from '../features/account/AccountScreen';
 import { DailyScreen } from '../features/daily/DailyScreen';
 import { FarawayScreen } from '../features/faraway/FarawayScreen';
 import { LettersScreen } from '../features/letters/LettersScreen';
@@ -68,6 +70,8 @@ export type RootStackParamList = {
   DataPrivacy: undefined;
   Feedback: undefined;
   LegalDocument: { type: 'privacy' | 'terms' };
+  AccountAccess: {initialChannel?: 'email' | 'phone'} | undefined;
+  Account: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -141,6 +145,8 @@ export function RootNavigator() {
         <Stack.Screen name="DataPrivacy" component={DataPrivacyScreen} />
         <Stack.Screen name="Feedback" component={FeedbackScreen} />
         <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
+        <Stack.Screen name="AccountAccess" component={AccountAccessScreen} />
+        <Stack.Screen name="Account" component={AccountScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

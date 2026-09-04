@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useToast } from '../../components/Toast';
 import { appMetadata } from '../../config/appMetadata';
+import { useAccountStore } from '../account/useAccountStore';
 import { useHaptics } from '../../hooks/useHaptics';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import {
@@ -107,6 +108,7 @@ export function ProfileScreen() {
   const toast = useToast();
   const haptics = useHaptics();
   const settings = useSettingsStore();
+  const account = useAccountStore(state => state.account);
   const [profile, setProfile] = useState(emptyProfile);
   const [dailyPickerOpen, setDailyPickerOpen] = useState(false);
   const [biometricLabel, setBiometricLabel] = useState('面容 ID');
@@ -292,33 +294,81 @@ export function ProfileScreen() {
             <View
               style={[
                 styles.accountStatusDot,
-                { backgroundColor: colors.textFaint },
+                {
+                  backgroundColor:
+                    account.status === 'signed_in_locked' ||
+                    account.status === 'signed_in_unlocked'
+                      ? colors.sage
+                      : account.status === 'restoring'
+                        ? colors.dusk
+                        : colors.textFaint,
+                },
               ]}
             />
             <Text style={[styles.accountState, { color: colors.textMuted }]}>
-              未注册
+              {account.status === 'restoring'
+                ? '正在确认'
+                : account.status === 'signed_in_locked' ||
+                    account.status === 'signed_in_unlocked'
+                  ? '已登录'
+                  : '未注册'}
             </Text>
           </View>
           <Text
-            accessibilityLabel="未注册，内容只保存在本机"
+            accessibilityLabel={
+              account.status === 'signed_in_locked'
+                ? '账号已登录，等待解锁'
+                : account.status === 'signed_in_unlocked'
+                  ? '账号已登录，本机已解锁'
+                  : '未注册，内容只保存在本机'
+            }
             style={[styles.accountTitle, { color: colors.text }]}
           >
-            内容只保存在本机
+            {account.status === 'signed_in_locked' ||
+            account.status === 'signed_in_unlocked'
+              ? account.session.email ??
+                account.session.phone ??
+                'DU 账号'
+              : '内容只保存在本机'}
           </Text>
           <Text style={[styles.accountDetail, { color: colors.textSoft }]}>
-            更换手机后，旧内容不会出现在新设备；删除应用或设备损坏后，内容无法恢复。
+            {account.status === 'signed_in_locked'
+              ? '需要恢复凭证或旧设备批准，才能读取已同步的加密内容。'
+              : account.status === 'signed_in_unlocked'
+                ? '本机加密密钥已解锁；媒体同步与换机恢复仍在准备中。'
+                : account.status === 'restoring'
+                  ? '正在确认这台设备上的账号状态，本地内容可继续使用。'
+                  : '更换手机后，旧内容不会出现在新设备；删除应用或设备损坏后，内容无法恢复。'}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="备份与恢复"
-            onPress={() => navigation.navigate('DataPrivacy')}
+            accessibilityLabel={
+              account.status === 'signed_in_locked' ||
+              account.status === 'signed_in_unlocked'
+                ? '账号与设备'
+                : '注册或登录'
+            }
+            disabled={account.status === 'restoring'}
+            onPress={() =>
+              navigation.navigate(
+                account.status === 'signed_in_locked' ||
+                  account.status === 'signed_in_unlocked'
+                  ? 'Account'
+                  : 'AccountAccess',
+              )
+            }
             style={({ pressed }) => [
               styles.accountAction,
               { borderTopColor: colors.line, opacity: pressed ? 0.64 : 1 },
             ]}
           >
             <Text style={[styles.accountActionText, { color: colors.accent }]}>
-              备份与恢复
+              {account.status === 'restoring'
+                ? '正在确认'
+                : account.status === 'signed_in_locked' ||
+                    account.status === 'signed_in_unlocked'
+                  ? '账号与设备'
+                  : '注册或登录'}
             </Text>
             <Chevron />
           </Pressable>

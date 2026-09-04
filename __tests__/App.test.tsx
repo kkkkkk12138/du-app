@@ -352,7 +352,7 @@ test('switches all tabs and exposes the prototype profile settings', async () =>
   });
   expect(localOnlyStatus.props.accessible).not.toBe(true);
   expect(
-    renderer.root.findByProps({ accessibilityLabel: '备份与恢复' }),
+    renderer.root.findByProps({ accessibilityLabel: '注册或登录' }),
   ).toBeTruthy();
   expect(
     renderer.root.findAllByProps({ accessibilityLabel: 'iCloud 备份' }),

@@ -22,6 +22,8 @@ export const linking: LinkingOptions<RootStackParamList> = {
       Bookshelf: 'profile/bookshelf',
       Scraps: 'profile/scraps',
       Feedback: 'profile/feedback',
+      AccountAccess: 'account/access',
+      Account: 'account',
       LegalDocument: 'legal/:type',
       About: 'about',
       AuthorLetter: 'author-letter',

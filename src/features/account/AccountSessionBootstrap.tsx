@@ -1,9 +1,8 @@
 import React, {PropsWithChildren, useEffect, useMemo} from 'react';
 
-import {developmentCloudBaseConfig} from '../../config/cloudServiceConfig';
 import type {AuthProvider} from './AuthProvider';
+import {getAccountAuthProvider} from './accountAuthProvider';
 import type {AccountSession} from './authTypes';
-import {createCloudBaseAuthProvider} from './cloudBaseAuthProvider';
 import {
   hasUnlockedAccountKey as readUnlockedAccountKey,
 } from './keyRecoveryState';
@@ -20,9 +19,7 @@ export function AccountSessionBootstrap({
   children,
 }: Props) {
   const provider = useMemo(
-    () =>
-      authProvider ??
-      createCloudBaseAuthProvider(developmentCloudBaseConfig),
+    () => authProvider ?? getAccountAuthProvider(),
     [authProvider],
   );
 
