@@ -28,6 +28,20 @@
         "COS_BUCKET": "{{env.COS_BUCKET}}",
         "COS_REGION": "ap-shanghai"
       }
+    },
+    {
+      "name": "media-confirm-upload",
+      "description": "Verify encrypted COS objects and consume reserved capacity",
+      "type": "Event",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "COS_BUCKET": "{{env.COS_BUCKET}}",
+        "COS_REGION": "ap-shanghai"
+      }
     }
   ],
   "database": {

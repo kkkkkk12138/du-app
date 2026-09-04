@@ -8,7 +8,9 @@ function createRuntimeDependencies({app, createCosClient, env}) {
       const {data, error} = await app
         .rdb()
         .from('media_upload_reservations')
-        .select('id,account_id,media_id,bytes,sha256,status,expires_at')
+        .select(
+          'id,account_id,media_id,bytes,sha256,status,object_key,expires_at',
+        )
         .eq('id', reservationId)
         .eq('account_id', accountId)
         .limit(1);
@@ -28,8 +30,29 @@ function createRuntimeDependencies({app, createCosClient, env}) {
         bytes: Number(row.bytes),
         sha256: row.sha256,
         status: row.status,
+        objectKey: row.object_key,
         expiresAt: Date.parse(row.expires_at),
       };
+    },
+
+    async markTicketed({reservationId, objectKey, expectedStatus}) {
+      const result = await app
+        .rdb()
+        .from('media_upload_reservations')
+        .update(
+          {
+            status: 'ticketed',
+            object_key: objectKey,
+            updated_at: new Date().toISOString(),
+          },
+          {count: 'exact'},
+        )
+        .eq('id', reservationId)
+        .eq('status', expectedStatus);
+      if (result?.error) {
+        throw new Error('无法记录媒体上传票据');
+      }
+      return result?.count === 1;
     },
 
     async signPutUrl({

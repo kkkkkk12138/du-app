@@ -34,6 +34,7 @@ function createDependencies(overrides = {}) {
     signPutUrl: jest
       .fn()
       .mockResolvedValue('https://du-media.cos.ap-shanghai.myqcloud.com/upload'),
+    markTicketed: jest.fn().mockResolvedValue(true),
     env: {
       COS_BUCKET: 'du-media-1234567890',
       COS_REGION: 'ap-shanghai',
@@ -121,6 +122,80 @@ describe('media-create-upload-ticket', () => {
           'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       },
     });
+    expect(dependencies.markTicketed).toHaveBeenCalledWith({
+      reservationId: 'reserve_01',
+      objectKey:
+        'users/user_01/media/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-media_01.enc',
+      expectedStatus: 'reserved',
+    });
+  });
+
+  test('reissues a ticketed reservation for the same object key', async () => {
+    const objectKey =
+      'users/user_01/media/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-media_01.enc';
+    const dependencies = createDependencies({
+      findReservation: jest.fn().mockResolvedValue({
+        id: 'reserve_01',
+        accountId: 'user_01',
+        mediaId: 'media_01',
+        bytes: 2_400_000,
+        sha256: 'a'.repeat(64),
+        status: 'ticketed',
+        objectKey,
+        expiresAt: 1_800_000,
+      }),
+    });
+    const handler = createMediaUploadTicketHandler(dependencies);
+
+    await expect(handler(validEvent, {})).resolves.toMatchObject({objectKey});
+    expect(dependencies.signPutUrl).toHaveBeenCalledWith(
+      expect.objectContaining({objectKey}),
+    );
+    expect(dependencies.markTicketed).not.toHaveBeenCalled();
+  });
+
+  test.each(['uploaded', 'verified', 'released', 'expired'])(
+    'rejects a reservation in %s state',
+    async status => {
+      const dependencies = createDependencies({
+        findReservation: jest.fn().mockResolvedValue({
+          id: 'reserve_01',
+          accountId: 'user_01',
+          mediaId: 'media_01',
+          bytes: 2_400_000,
+          sha256: 'a'.repeat(64),
+          status,
+          expiresAt: 1_800_000,
+        }),
+      });
+      const handler = createMediaUploadTicketHandler(dependencies);
+
+      await expect(handler(validEvent, {})).rejects.toThrow(
+        '媒体上传预留无效',
+      );
+      expect(dependencies.signPutUrl).not.toHaveBeenCalled();
+    },
+  );
+
+  test('rejects a ticketed reservation with a different object key', async () => {
+    const dependencies = createDependencies({
+      findReservation: jest.fn().mockResolvedValue({
+        id: 'reserve_01',
+        accountId: 'user_01',
+        mediaId: 'media_01',
+        bytes: 2_400_000,
+        sha256: 'a'.repeat(64),
+        status: 'ticketed',
+        objectKey: 'users/user_01/media/wrong.enc',
+        expiresAt: 1_800_000,
+      }),
+    });
+    const handler = createMediaUploadTicketHandler(dependencies);
+
+    await expect(handler(validEvent, {})).rejects.toThrow(
+      '媒体上传预留无效',
+    );
+    expect(dependencies.signPutUrl).not.toHaveBeenCalled();
   });
 
   test('rejects non-HTTPS signed URLs', async () => {
@@ -146,6 +221,7 @@ describe('media-create-upload-ticket runtime', () => {
           bytes: 2_400_000,
           sha256: 'a'.repeat(64),
           status: 'reserved',
+          object_key: null,
           expires_at: '1970-01-01T00:30:00.000Z',
         },
       ],
@@ -185,11 +261,44 @@ describe('media-create-upload-ticket runtime', () => {
       bytes: 2_400_000,
       sha256: 'a'.repeat(64),
       status: 'reserved',
+      objectKey: null,
       expiresAt: 1_800_000,
     });
     expect(from).toHaveBeenCalledWith('media_upload_reservations');
     expect(eqReservation).toHaveBeenCalledWith('id', 'reserve_01');
     expect(eqAccount).toHaveBeenCalledWith('account_id', 'user_01');
+  });
+
+  test('marks a reservation ticketed with a conditional status update', async () => {
+    const finalEq = jest.fn().mockResolvedValue({count: 1, error: null});
+    const statusEq = jest.fn(() => ({eq: finalEq}));
+    const update = jest.fn(() => ({eq: statusEq}));
+    const from = jest.fn(() => ({update}));
+    const runtime = createRuntimeDependencies({
+      app: {
+        auth: () => ({getUserInfo: jest.fn()}),
+        rdb: () => ({from}),
+      },
+      createCosClient: jest.fn(),
+      env: {},
+    });
+
+    await expect(
+      runtime.markTicketed({
+        reservationId: 'reserve_01',
+        objectKey: 'users/user_01/media/file.enc',
+        expectedStatus: 'reserved',
+      }),
+    ).resolves.toBe(true);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'ticketed',
+        object_key: 'users/user_01/media/file.enc',
+      }),
+      {count: 'exact'},
+    );
+    expect(statusEq).toHaveBeenCalledWith('id', 'reserve_01');
+    expect(finalEq).toHaveBeenCalledWith('status', 'reserved');
   });
 
   test('signs PUT URLs with temporary SCF credentials', async () => {
@@ -254,12 +363,18 @@ test('wires the CloudBase function entry without static credentials', async () =
                   bytes: 2_400_000,
                   sha256: 'a'.repeat(64),
                   status: 'reserved',
+                  object_key: null,
                   expires_at: '2099-01-01T00:00:00.000Z',
                 },
               ],
               error: null,
             }),
           }),
+        }),
+      }),
+      update: () => ({
+        eq: () => ({
+          eq: async () => ({count: 1, error: null}),
         }),
       }),
     }),

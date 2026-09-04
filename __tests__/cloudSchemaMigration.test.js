@@ -22,6 +22,13 @@ const reservedBytesMigrationPath = path.join(
   'migrations',
   '20260904071000_add_reserved_media_bytes.sql',
 );
+const confirmUploadMigrationPath = path.join(
+  __dirname,
+  '..',
+  'cloudbase',
+  'migrations',
+  '20260904072000_confirm_media_upload.sql',
+);
 const migrationsDirectory = path.dirname(migrationPath);
 
 describe('CloudBase account, sync, and billing schema', () => {
@@ -125,5 +132,25 @@ describe('CloudBase account, sync, and billing schema', () => {
       'free_media_used_bytes + reserved_free_bytes <= free_media_limit_bytes',
     );
     expect(sql).toContain("'allocating'");
+  });
+
+  test('confirms uploaded media and moves quota atomically', () => {
+    const sql = fs.readFileSync(confirmUploadMigrationPath, 'utf8');
+
+    expect(sql).toContain(
+      'CREATE FUNCTION public.confirm_media_upload',
+    );
+    expect(sql).toContain('FOR UPDATE');
+    expect(sql).toContain(
+      'reserved_free_bytes = reserved_free_bytes -',
+    );
+    expect(sql).toContain(
+      'free_media_used_bytes = free_media_used_bytes +',
+    );
+    expect(sql).toContain("status = 'verified'");
+    expect(sql).toContain("upload_status = 'verified'");
+    expect(sql).toContain(
+      'REVOKE ALL ON FUNCTION public.confirm_media_upload',
+    );
   });
 });

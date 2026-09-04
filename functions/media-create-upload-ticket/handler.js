@@ -35,7 +35,7 @@ function assertReservation(reservation, input, accountId, now) {
     reservation.mediaId !== input.mediaId ||
     reservation.bytes !== input.bytes ||
     reservation.sha256 !== input.sha256 ||
-    reservation.status !== 'reserved' ||
+    !['reserved', 'ticketed'].includes(reservation.status) ||
     reservation.expiresAt <= now
   ) {
     throw new Error('媒体上传预留无效');
@@ -46,6 +46,7 @@ function createMediaUploadTicketHandler({
   getUser,
   findReservation,
   signPutUrl,
+  markTicketed,
   env,
   now = Date.now,
 }) {
@@ -76,6 +77,12 @@ function createMediaUploadTicketHandler({
       input.sha256.slice(0, 2),
       `${input.sha256}-${input.mediaId}.enc`,
     ].join('/');
+    if (
+      reservation.status === 'ticketed' &&
+      reservation.objectKey !== objectKey
+    ) {
+      throw new Error('媒体上传预留无效');
+    }
     const headers = {
       'Content-Type': 'application/octet-stream',
       'x-cos-meta-sha256': input.sha256,
@@ -90,6 +97,16 @@ function createMediaUploadTicketHandler({
 
     if (!uploadUrl.startsWith('https://')) {
       throw new Error('COS 上传地址必须使用 HTTPS');
+    }
+    if (
+      reservation.status === 'reserved' &&
+      !(await markTicketed({
+        reservationId: reservation.id,
+        objectKey,
+        expectedStatus: 'reserved',
+      }))
+    ) {
+      throw new Error('媒体上传预留状态已变化，请重试');
     }
 
     return {
