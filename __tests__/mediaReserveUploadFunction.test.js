@@ -194,6 +194,12 @@ describe('media-reserve-upload', () => {
       reservedFreeBytes: 6144,
     });
     expect(compareAndSwapReservedBytes).toHaveBeenCalledTimes(3);
+    expect(compareAndSwapReservedBytes).toHaveBeenLastCalledWith({
+      accountId: 'user_01',
+      entryCommitId: 'commit_01',
+      expectedReservedBytes: 4000,
+      nextReservedBytes: 10_144,
+    });
     expect(ensureCreditAccount).toHaveBeenCalledTimes(3);
   });
 
@@ -252,18 +258,15 @@ describe('media-reserve-upload', () => {
 });
 
 describe('media-reserve-upload runtime', () => {
-  test('uses an account-scoped compare-and-swap for reserved bytes', async () => {
-    const finalEq = jest.fn().mockResolvedValue({
-      count: 1,
+  test('atomically binds reserved bytes to the entry commit', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: true,
       error: null,
     });
-    const accountEq = jest.fn(() => ({eq: finalEq}));
-    const update = jest.fn(() => ({eq: accountEq}));
-    const from = jest.fn(() => ({update}));
     const runtime = createRuntimeDependencies({
       app: {
         auth: () => ({getUserInfo: jest.fn()}),
-        rdb: () => ({from}),
+        rdb: () => ({rpc}),
       },
       randomUUID: jest.fn(),
     });
@@ -271,19 +274,17 @@ describe('media-reserve-upload runtime', () => {
     await expect(
       runtime.compareAndSwapReservedBytes({
         accountId: 'user_01',
+        entryCommitId: 'commit_01',
         expectedReservedBytes: 2000,
         nextReservedBytes: 8144,
       }),
     ).resolves.toBe(true);
-    expect(from).toHaveBeenCalledWith('credit_accounts');
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        reserved_free_bytes: 8144,
-      }),
-      {count: 'exact'},
-    );
-    expect(accountEq).toHaveBeenCalledWith('account_id', 'user_01');
-    expect(finalEq).toHaveBeenCalledWith('reserved_free_bytes', 2000);
+    expect(rpc).toHaveBeenCalledWith('reserve_media_capacity', {
+      p_account_id: 'user_01',
+      p_entry_commit_id: 'commit_01',
+      p_expected_reserved_bytes: 2000,
+      p_next_reserved_bytes: 8144,
+    });
   });
 
   test('creates reservation IDs on the server', async () => {
@@ -361,6 +362,38 @@ describe('media-reserve-upload runtime', () => {
       }),
     ).rejects.toThrow('媒体空间预留账本不一致');
     expect(runtime.compareAndSwapReservedBytes).not.toHaveBeenCalled();
+  });
+
+  test('uses a separate account CAS for partial-failure compensation', async () => {
+    const finalEq = jest.fn().mockResolvedValue({count: 1, error: null});
+    const accountEq = jest.fn(() => ({eq: finalEq}));
+    const update = jest.fn(() => ({eq: accountEq}));
+    const from = jest.fn(() => ({update}));
+    const runtime = createRuntimeDependencies({
+      app: {
+        auth: () => ({getUserInfo: jest.fn()}),
+        rdb: () => ({from}),
+      },
+      randomUUID: jest.fn(),
+    });
+    runtime.ensureCreditAccount = jest.fn().mockResolvedValue({
+      accountId: 'user_01',
+      freeMediaLimitBytes: 524_288_000,
+      freeMediaUsedBytes: 1000,
+      reservedFreeBytes: 8144,
+    });
+
+    await expect(
+      runtime.releaseReservedBytes({
+        accountId: 'user_01',
+        reservedBytes: 6144,
+      }),
+    ).resolves.toBeUndefined();
+    expect(from).toHaveBeenCalledWith('credit_accounts');
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({reserved_free_bytes: 2000}),
+      {count: 'exact'},
+    );
   });
 });
 

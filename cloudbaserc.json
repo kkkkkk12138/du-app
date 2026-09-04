@@ -42,6 +42,16 @@
         "COS_BUCKET": "{{env.COS_BUCKET}}",
         "COS_REGION": "ap-shanghai"
       }
+    },
+    {
+      "name": "media-release-upload",
+      "description": "Release cancelled or expired media upload reservations",
+      "type": "Event",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
     }
   ],
   "database": {

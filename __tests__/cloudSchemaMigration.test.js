@@ -29,6 +29,13 @@ const confirmUploadMigrationPath = path.join(
   'migrations',
   '20260904072000_confirm_media_upload.sql',
 );
+const releaseUploadMigrationPath = path.join(
+  __dirname,
+  '..',
+  'cloudbase',
+  'migrations',
+  '20260904073000_release_media_reservations.sql',
+);
 const migrationsDirectory = path.dirname(migrationPath);
 
 describe('CloudBase account, sync, and billing schema', () => {
@@ -151,6 +158,33 @@ describe('CloudBase account, sync, and billing schema', () => {
     expect(sql).toContain("upload_status = 'verified'");
     expect(sql).toContain(
       'REVOKE ALL ON FUNCTION public.confirm_media_upload',
+    );
+  });
+
+  test('tracks and releases reserved quota atomically', () => {
+    const sql = fs.readFileSync(releaseUploadMigrationPath, 'utf8');
+
+    expect(sql).toContain(
+      'ADD COLUMN quota_reserved_at timestamptz',
+    );
+    expect(sql).toContain(
+      'CREATE FUNCTION public.reserve_media_capacity',
+    );
+    expect(sql).toContain(
+      'CREATE FUNCTION public.release_media_reservation',
+    );
+    expect(sql).toContain(
+      "commit_row.status NOT IN ('allocating', 'reserved')",
+    );
+    expect(sql).toContain(
+      "reservation.status IN ('reserved', 'ticketed')",
+    );
+    expect(sql).toContain(
+      'reserved_free_bytes = reserved_free_bytes -',
+    );
+    expect(sql).toContain('FOR UPDATE');
+    expect(sql).toContain(
+      'REVOKE ALL ON FUNCTION public.release_media_reservation',
     );
   });
 });

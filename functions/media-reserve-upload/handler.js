@@ -137,6 +137,7 @@ function createMediaReservationHandler({
         assertCapacity(creditAccount, input.reservedFreeBytes);
         quotaReserved = await compareAndSwapReservedBytes({
           accountId: user.uid,
+          entryCommitId: input.entryCommitId,
           expectedReservedBytes: creditAccount.reservedFreeBytes,
           nextReservedBytes:
             creditAccount.reservedFreeBytes + input.reservedFreeBytes,

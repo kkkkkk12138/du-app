@@ -39,6 +39,27 @@ function createRuntimeDependencies({
   randomUUID = createRandomUUID,
 }) {
   const rdb = () => app.rdb();
+  const compareAndSwapAccountReservedBytes = async ({
+    accountId,
+    expectedReservedBytes,
+    nextReservedBytes,
+  }) => {
+    const result = await rdb()
+      .from('credit_accounts')
+      .update(
+        {
+          reserved_free_bytes: nextReservedBytes,
+          updated_at: new Date().toISOString(),
+        },
+        {count: 'exact'},
+      )
+      .eq('account_id', accountId)
+      .eq('reserved_free_bytes', expectedReservedBytes);
+    if (result?.error) {
+      throw new Error('无法更新媒体空间预留');
+    }
+    return result?.count === 1;
+  };
 
   const runtime = {
     async getUser() {
@@ -131,24 +152,20 @@ function createRuntimeDependencies({
 
     async compareAndSwapReservedBytes({
       accountId,
+      entryCommitId,
       expectedReservedBytes,
       nextReservedBytes,
     }) {
-      const result = await rdb()
-        .from('credit_accounts')
-        .update(
-          {
-            reserved_free_bytes: nextReservedBytes,
-            updated_at: new Date().toISOString(),
-          },
-          {count: 'exact'},
-        )
-        .eq('account_id', accountId)
-        .eq('reserved_free_bytes', expectedReservedBytes);
+      const result = await rdb().rpc('reserve_media_capacity', {
+        p_account_id: accountId,
+        p_entry_commit_id: entryCommitId,
+        p_expected_reserved_bytes: expectedReservedBytes,
+        p_next_reserved_bytes: nextReservedBytes,
+      });
       if (result?.error) {
         throw new Error('无法更新媒体空间预留');
       }
-      return result?.count === 1;
+      return result?.data === true;
     },
 
     async createReservations({
@@ -196,6 +213,7 @@ function createRuntimeDependencies({
         .from('entry_commits')
         .update({
           status: 'failed',
+          quota_reserved_at: null,
           updated_at: new Date().toISOString(),
         })
         .eq('account_id', accountId)
@@ -209,7 +227,7 @@ function createRuntimeDependencies({
         if (account.reservedFreeBytes < reservedBytes) {
           throw new Error('媒体空间预留账本不一致');
         }
-        const released = await runtime.compareAndSwapReservedBytes({
+        const released = await compareAndSwapAccountReservedBytes({
           accountId,
           expectedReservedBytes: account.reservedFreeBytes,
           nextReservedBytes: account.reservedFreeBytes - reservedBytes,
