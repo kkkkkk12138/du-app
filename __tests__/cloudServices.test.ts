@@ -99,6 +99,120 @@ test('requests a short-lived COS upload ticket through CloudBase', async () => {
   });
 });
 
+test('exposes the complete media reservation lifecycle', async () => {
+  const callFunction = jest.fn(
+    async <T>({name}: {name: string}): Promise<{
+      requestId: string;
+      result: T;
+    }> => {
+      let response: {requestId: string; result: unknown};
+    if (name === 'media-reserve-upload') {
+        response = {
+        requestId: 'reserve-request',
+        result: {
+          entryCommitId: 'commit-1',
+          status: 'reserved',
+          reservedFreeBytes: 2048,
+          expiresAt: 1_788_425_000_000,
+          media: [
+            {
+              id: 'reservation-1',
+              mediaId: 'media-1',
+              mediaKind: 'photo',
+              bytes: 2048,
+              sha256: 'a'.repeat(64),
+              status: 'reserved',
+            },
+          ],
+        },
+      };
+      } else if (name === 'media-confirm-upload') {
+        response = {
+        requestId: 'confirm-request',
+        result: {
+          reservationId: 'reservation-1',
+          status: 'verified',
+          mediaObject: {
+            id: 'media-1',
+            objectKey: 'users/user-1/media/media-1.enc',
+            sha256: 'a'.repeat(64),
+            encryptedBytes: 2048,
+            mediaKind: 'photo',
+            uploadStatus: 'verified',
+          },
+        },
+      };
+      } else {
+        response = {
+          requestId: 'release-request',
+          result: {
+            entryCommitId: 'commit-1',
+            status: 'released',
+            releasedFreeBytes: 2048,
+          },
+        };
+      }
+      return response as {requestId: string; result: T};
+    }
+  );
+  const gateway = createCloudBaseGateway(
+    configuredCloud,
+    () => ({
+      callFunction: async <T>(request: {
+        name: string;
+        data?: Record<string, unknown>;
+      }) =>
+        (await callFunction(request)) as {
+          requestId: string;
+          result: T;
+        },
+    }),
+  );
+  const reservationInput = {
+    entryCommitId: 'commit-1',
+    entryType: 'memory' as const,
+    localEntryId: 'memory-1',
+    idempotencyKey: 'memory-1-revision-1',
+    media: [
+      {
+        mediaId: 'media-1',
+        mediaKind: 'photo' as const,
+        encryptedBytes: 2048,
+        sha256: 'a'.repeat(64),
+      },
+    ],
+  };
+
+  await expect(
+    gateway.reserveMediaUpload(reservationInput),
+  ).resolves.toMatchObject({
+    entryCommitId: 'commit-1',
+    status: 'reserved',
+  });
+  await expect(
+    gateway.confirmMediaUpload({reservationId: 'reservation-1'}),
+  ).resolves.toMatchObject({status: 'verified'});
+  await expect(
+    gateway.releaseMediaUpload({
+      entryCommitId: 'commit-1',
+      reason: 'cancelled',
+    }),
+  ).resolves.toBeUndefined();
+
+  expect(callFunction).toHaveBeenNthCalledWith(1, {
+    name: 'media-reserve-upload',
+    data: reservationInput,
+  });
+  expect(callFunction).toHaveBeenNthCalledWith(2, {
+    name: 'media-confirm-upload',
+    data: {reservationId: 'reservation-1'},
+  });
+  expect(callFunction).toHaveBeenNthCalledWith(3, {
+    name: 'media-release-upload',
+    data: {entryCommitId: 'commit-1', reason: 'cancelled'},
+  });
+});
+
 test('uploads only encrypted media through a signed HTTPS URL', async () => {
   const uploader = jest.fn().mockResolvedValue({statusCode: 200});
 
