@@ -41,6 +41,15 @@ jest.mock('../src/navigation/linking', () => ({
   linking: undefined,
 }));
 
+jest.mock('../src/features/account/AccountSessionBootstrap', () => {
+  const ReactModule = require('react');
+
+  return {
+    AccountSessionBootstrap: ({children}: {children: React.ReactNode}) =>
+      ReactModule.createElement(ReactModule.Fragment, null, children),
+  };
+});
+
 jest.mock('@nozbe/watermelondb/react', () => {
   const ReactModule = require('react');
 

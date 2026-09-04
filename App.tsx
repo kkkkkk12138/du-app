@@ -8,6 +8,7 @@ import {AppBootstrap} from './src/components/AppBootstrap';
 import {OverlayHostProvider} from './src/components/OverlayHost';
 import {ToastProvider} from './src/components/Toast';
 import {database} from './src/db/database';
+import {AccountSessionBootstrap} from './src/features/account/AccountSessionBootstrap';
 import {RootNavigator} from './src/navigation/RootNavigator';
 import {ThemeProvider} from './src/theme/ThemeProvider';
 
@@ -20,7 +21,9 @@ function App() {
             <ToastProvider>
               <OverlayHostProvider>
                 <AppBootstrap>
-                  <RootNavigator />
+                  <AccountSessionBootstrap>
+                    <RootNavigator />
+                  </AccountSessionBootstrap>
                 </AppBootstrap>
               </OverlayHostProvider>
             </ToastProvider>

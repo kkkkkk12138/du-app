@@ -1,6 +1,7 @@
 import cloudbase from '@cloudbase/js-sdk';
 
 import type {CloudBaseConfig} from '../../config/cloudServiceConfig';
+import {ensureCloudBaseReactNativeStorage} from '../../services/cloudBaseReactNativeStorage';
 import type {AuthProvider} from './AuthProvider';
 import {toAccountAuthError} from './authErrors';
 import {
@@ -9,8 +10,14 @@ import {
   type AccountSession,
   type VerificationChallenge,
 } from './authTypes';
+import {
+  cloudBaseCredentialStore,
+  type CloudBaseCredentials,
+  type CloudBaseCredentialStore,
+} from './cloudBaseCredentialStore';
 
 type CloudBaseUser = {
+  id?: string;
   uid?: string;
   sub?: string;
   email?: string;
@@ -18,6 +25,12 @@ type CloudBaseUser = {
   phoneNumber?: string;
   phone_number?: string;
   providers?: Array<{name?: string; id?: string}>;
+  app_metadata?: {
+    providers?: Array<string | {name?: string; id?: string}>;
+  };
+  user_metadata?: {
+    uid?: string;
+  };
 };
 
 type CloudBaseSessionPayload = {
@@ -48,6 +61,8 @@ type CloudBaseAuthRuntime = {
     phoneNum: string;
   }): Promise<CloudBaseSessionPayload>;
   getLoginState(): Promise<CloudBaseSessionPayload | null>;
+  getCredentials(): Promise<CloudBaseCredentials>;
+  setCredentials(credentials: CloudBaseCredentials): Promise<void>;
   signOut(): Promise<unknown>;
   onAuthStateChange(
     listener: (
@@ -72,8 +87,10 @@ type CloudBaseAuthInitializer = (input: {
   region: CloudBaseConfig['region'];
 }) => CloudBaseAuthApp;
 
-const initializeCloudBaseAuth: CloudBaseAuthInitializer = input =>
-  cloudbase.init(input) as unknown as CloudBaseAuthApp;
+const initializeCloudBaseAuth: CloudBaseAuthInitializer = input => {
+  ensureCloudBaseReactNativeStorage();
+  return cloudbase.init(input) as unknown as CloudBaseAuthApp;
+};
 
 function normalizeEmail(value: string) {
   const email = value.trim().toLowerCase();
@@ -114,8 +131,12 @@ function readUser(payload: CloudBaseSessionPayload | null | undefined) {
 
 function readProviders(user: CloudBaseUser): AccountProvider[] {
   const names = new Set(
-    user.providers
-      ?.map(provider => provider.name ?? provider.id)
+    [...(user.providers ?? []), ...(user.app_metadata?.providers ?? [])]
+      .map(provider =>
+        typeof provider === 'string'
+          ? provider
+          : provider.name ?? provider.id,
+      )
       .filter((name): name is string => Boolean(name)),
   );
 
@@ -133,7 +154,8 @@ function toAccountSession(
   payload: CloudBaseSessionPayload | null | undefined,
 ): AccountSession | null {
   const user = readUser(payload);
-  const uid = user?.uid ?? user?.sub;
+  const uid =
+    user?.uid ?? user?.sub ?? user?.id ?? user?.user_metadata?.uid;
   if (!user || !uid) {
     return null;
   }
@@ -174,15 +196,27 @@ function createChallenge(
 export function createCloudBaseAuthProvider(
   config: CloudBaseConfig,
   initialize: CloudBaseAuthInitializer = initializeCloudBaseAuth,
+  credentialStore: CloudBaseCredentialStore = cloudBaseCredentialStore,
 ): AuthProvider {
   const auth = initialize({
     env: config.envId,
     region: config.region,
   }).auth();
 
+  const persistCredentials = async () => {
+    const credentials = await auth.getCredentials();
+    if (credentials && typeof credentials === 'object') {
+      await credentialStore.write(credentials);
+    }
+  };
+
   return {
     async restoreSession() {
       try {
+        const credentials = await credentialStore.read();
+        if (credentials) {
+          await auth.setCredentials(credentials);
+        }
         return toAccountSession(await auth.getLoginState());
       } catch (error) {
         throw toAccountAuthError(error);
@@ -205,13 +239,15 @@ export function createCloudBaseAuthProvider(
       }
       const code = normalizeVerificationCode(value);
       try {
-        return requireSession(
+        const session = requireSession(
           await auth.signInWithEmail({
             verificationInfo: challenge.raw,
             verificationCode: code,
             email: challenge.destination,
           }),
         );
+        await persistCredentials();
+        return session;
       } catch (error) {
         throw toAccountAuthError(error);
       }
@@ -235,13 +271,15 @@ export function createCloudBaseAuthProvider(
       }
       const code = normalizeVerificationCode(value);
       try {
-        return requireSession(
+        const session = requireSession(
           await auth.signInWithSms({
             verificationInfo: challenge.raw,
             verificationCode: code,
             phoneNum: challenge.destination,
           }),
         );
+        await persistCredentials();
+        return session;
       } catch (error) {
         throw toAccountAuthError(error);
       }
@@ -250,6 +288,7 @@ export function createCloudBaseAuthProvider(
     async signOut() {
       try {
         await auth.signOut();
+        await credentialStore.clear();
       } catch (error) {
         throw toAccountAuthError(error);
       }

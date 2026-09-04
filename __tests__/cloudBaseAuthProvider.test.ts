@@ -18,6 +18,8 @@ function createRuntime() {
     signInWithEmail: jest.fn(),
     signInWithSms: jest.fn(),
     getLoginState: jest.fn(),
+    getCredentials: jest.fn(),
+    setCredentials: jest.fn(),
     signOut: jest.fn(),
     onAuthStateChange: jest.fn(),
     onLoginStateChanged: jest.fn(),
@@ -27,6 +29,14 @@ function createRuntime() {
   }));
 
   return {auth, initialize};
+}
+
+function createCredentialStore() {
+  return {
+    read: jest.fn(),
+    write: jest.fn(),
+    clear: jest.fn(),
+  };
 }
 
 test('defines every supported account provider in rollout order', () => {
@@ -183,8 +193,12 @@ test('subscribes through the removable CloudBase auth listener', () => {
   const callback = auth.onAuthStateChange.mock.calls[0][0];
   callback('SIGNED_IN', {
     user: {
-      uid: 'account-4',
+      id: 'account-4',
       email: 'person@example.com',
+      phone: '+86 13800000000',
+      app_metadata: {
+        providers: ['email', 'phone'],
+      },
     },
   });
   removeListener();
@@ -192,8 +206,33 @@ test('subscribes through the removable CloudBase auth listener', () => {
   expect(listener).toHaveBeenCalledWith({
     uid: 'account-4',
     email: 'person@example.com',
-    providers: ['email'],
+    phone: '+86 13800000000',
+    providers: ['email', 'phone'],
   });
   expect(unsubscribe).toHaveBeenCalledTimes(1);
   expect(auth.onLoginStateChanged).not.toHaveBeenCalled();
+});
+
+test('restores CloudBase credentials from secure storage', async () => {
+  const {auth, initialize} = createRuntime();
+  const credentialStore = createCredentialStore();
+  const credentials = {refresh_token: 'refresh-secret'};
+  credentialStore.read.mockResolvedValue(credentials);
+  auth.setCredentials.mockResolvedValue(undefined);
+  auth.getLoginState.mockResolvedValue({
+    user: {
+      uid: 'account-5',
+      email: 'person@example.com',
+    },
+  });
+  const provider = createCloudBaseAuthProvider(
+    configuredCloud,
+    initialize,
+    credentialStore,
+  );
+
+  await provider.restoreSession();
+
+  expect(auth.setCredentials).toHaveBeenCalledWith(credentials);
+  expect(auth.getLoginState).toHaveBeenCalledTimes(1);
 });
