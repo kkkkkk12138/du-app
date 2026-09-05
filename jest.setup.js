@@ -98,6 +98,8 @@ jest.mock('react-native-fs', () => ({
   __esModule: true,
   default: {
     DocumentDirectoryPath: '/tmp',
+    CachesDirectoryPath: '/tmp',
+    TemporaryDirectoryPath: '/tmp',
     mkdir: jest.fn().mockResolvedValue(undefined),
     copyFile: jest.fn().mockResolvedValue(undefined),
     exists: jest.fn().mockResolvedValue(true),
@@ -107,6 +109,36 @@ jest.mock('react-native-fs', () => ({
     writeFile: jest.fn().mockResolvedValue(undefined),
   },
 }));
+
+const {NativeModules} = require('react-native');
+
+NativeModules.DuMediaCrypto = {
+  generateRandomKey: jest
+    .fn()
+    .mockResolvedValue(
+      'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=',
+    ),
+  keyVerifier: jest.fn().mockResolvedValue('a'.repeat(64)),
+  encryptMediaFile: jest.fn(input =>
+    Promise.resolve({
+      encryptedPath: input.destinationPath,
+      encryptedBytes: 2048,
+      plaintextBytes: 1024,
+      sha256: 'b'.repeat(64),
+      formatVersion: 1,
+    }),
+  ),
+  inspectEncryptedFile: jest.fn(path =>
+    Promise.resolve({
+      encryptedPath: path,
+      encryptedBytes: 2048,
+      plaintextBytes: 1024,
+      sha256: 'b'.repeat(64),
+      formatVersion: 1,
+    }),
+  ),
+  deleteEncryptedFile: jest.fn().mockResolvedValue(undefined),
+};
 
 jest.mock('react-native-keychain', () => ({
   ACCESSIBLE: {
