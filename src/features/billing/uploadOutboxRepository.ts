@@ -72,6 +72,15 @@ export type CreateUploadJobInput = {
   }>;
 };
 
+export type PendingUploadOutboxInput = Pick<
+  CreateUploadJobInput,
+  'entryCommitId' | 'accountUid' | 'state'
+> & {
+  items: Array<
+    Omit<CreateUploadJobInput['items'][number], 'sourcePath'>
+  >;
+};
+
 type RepositoryOptions = {
   database?: Pick<Database, 'get' | 'write'>;
   now?: () => number;

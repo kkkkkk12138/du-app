@@ -28,7 +28,7 @@ beforeEach(() => {
   mockCollections.letters.length = 0;
 });
 
-test('creates linked future memory and traveling letter atomically', async () => {
+test('creates linked future memory and pending notification atomically', async () => {
   const result = await createFutureLetter({
     draft: {
       content: '留给未来的这一封。',
@@ -59,7 +59,8 @@ test('creates linked future memory and traveling letter atomically', async () =>
       memoryId: 'memories-1',
       arriveDate: new Date(2027, 7, 2, 18, 30),
       arriveType: 'one_year',
-      status: 'traveling',
+      status: 'pending_notification',
+      notificationStatus: 'pending',
       toType: 'future_self',
     }),
   );

@@ -13,6 +13,10 @@ import {
   PreparedMediaFile,
   rollbackPreparedMedia,
 } from '../services/mediaStorage';
+import {
+  uploadOutboxRepository,
+  type PendingUploadOutboxInput,
+} from '../features/billing/uploadOutboxRepository';
 
 export type CreateMemoryInput = {
   draftId?: string;
@@ -29,26 +33,65 @@ export type CreateMemoryInput = {
   inkImagePath?: string;
 };
 
-export async function createMemory(input: CreateMemoryInput) {
+export type MemoryPersistenceOptions = {
+  localEntryId: string;
+  outbox?: PendingUploadOutboxInput;
+};
+
+export type MemoryPersistenceResult = {
+  memory: Memory;
+  uploadJobId?: string;
+};
+
+export function createMemory(
+  input: CreateMemoryInput,
+): Promise<Memory>;
+export function createMemory(
+  input: CreateMemoryInput,
+  options: MemoryPersistenceOptions,
+): Promise<MemoryPersistenceResult>;
+export async function createMemory(
+  input: CreateMemoryInput,
+  options?: MemoryPersistenceOptions,
+): Promise<Memory | MemoryPersistenceResult> {
   const prepared: PreparedMediaFile[] = [];
 
   try {
-    prepared.push(
-      await prepareMediaForPersistence(input.imagePath, 'photo', 'jpg'),
-    );
-    prepared.push(
-      await prepareMediaForPersistence(input.audioPath, 'audio', 'wav'),
-    );
-    prepared.push(
-      await prepareMediaForPersistence(input.inkImagePath, 'ink', 'png'),
-    );
     let draft: Memory | undefined;
-    if (input.draftId) {
+    const existingId = input.draftId ?? options?.localEntryId;
+    if (existingId) {
       try {
-        draft = await database.get<Memory>('memories').find(input.draftId);
+        draft = await database
+          .get<Memory>('memories')
+          .find(existingId);
       } catch {
         draft = undefined;
       }
+    }
+    const reuseCommittedMemory =
+      options !== undefined &&
+      draft !== undefined &&
+      draft.status !== 'draft';
+    if (reuseCommittedMemory && draft) {
+      prepared.push(
+        {path: draft.imagePath},
+        {path: draft.audioPath},
+        {path: draft.inkImagePath},
+      );
+    } else {
+      prepared.push(
+        await prepareMediaForPersistence(input.imagePath, 'photo', 'jpg'),
+      );
+      prepared.push(
+        await prepareMediaForPersistence(input.audioPath, 'audio', 'wav'),
+      );
+      prepared.push(
+        await prepareMediaForPersistence(
+          input.inkImagePath,
+          'ink',
+          'png',
+        ),
+      );
     }
     const now = Date.now();
     const writtenAt = input.writtenAt ?? new Date(now);
@@ -59,7 +102,7 @@ export async function createMemory(input: CreateMemoryInput) {
       (await resolvePlaceId(input.placeDetail, writtenAt, placeCity));
     const storedPlaceCity = await getPlaceCity(placeId);
     const resolvedPlaceCity = storedPlaceCity ?? placeCity;
-    const memory = await database.write(async () => {
+    const result = await database.write(async () => {
       const apply = (record: Memory) => {
         record.type = input.type ?? 'text';
         record.content = input.content;
@@ -84,18 +127,50 @@ export async function createMemory(input: CreateMemoryInput) {
         record.deleted = false;
       };
 
-      if (draft?.status === 'draft') {
+      let memory: Memory;
+      if (reuseCommittedMemory && draft) {
+        memory = draft;
+      } else if (draft?.status === 'draft') {
         await draft.update(apply);
-        return draft;
+        memory = draft;
+      } else {
+        memory = await database.get<Memory>('memories').create(record => {
+          if (options?.localEntryId) {
+            record._raw.id = options.localEntryId;
+          }
+          apply(record);
+          record.createdAt = new Date(now);
+        });
       }
 
-      return database.get<Memory>('memories').create(record => {
-        apply(record);
-        record.createdAt = new Date(now);
-      });
+      let uploadJobId: string | undefined;
+      if (options?.outbox) {
+        const paths = {
+          photo: prepared[0].path,
+          audio: prepared[1].path,
+          ink: prepared[2].path,
+        };
+        const created = await uploadOutboxRepository.createJobInCurrentWriter({
+          entryCommitId: options.outbox.entryCommitId,
+          entryType: 'memory',
+          localEntryId: memory.id,
+          accountUid: options.outbox.accountUid,
+          state: options.outbox.state,
+          items: options.outbox.items.map(item => {
+            const sourcePath = paths[item.mediaKind];
+            if (!sourcePath) {
+              throw new Error('上传媒体缺少持久化路径');
+            }
+            return {...item, sourcePath};
+          }),
+        });
+        uploadJobId = created.job.id;
+      }
+
+      return {memory, uploadJobId};
     });
     await finalizePreparedMedia(prepared);
-    return memory;
+    return options ? result : result.memory;
   } catch (error) {
     await rollbackPreparedMedia(prepared);
     throw error;
