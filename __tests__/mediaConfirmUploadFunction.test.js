@@ -105,6 +105,21 @@ describe('media-confirm-upload', () => {
     });
   });
 
+  test('returns MEDIA_RESERVATION_EXPIRED for an expired reservation', async () => {
+    const dependencies = createDependencies({
+      findReservation: jest.fn().mockResolvedValue({
+        ...reservation,
+        expiresAt: 1_200_000,
+      }),
+    });
+    const handler = createMediaConfirmUploadHandler(dependencies);
+
+    await expect(handler(validEvent, {})).rejects.toMatchObject({
+      code: 'MEDIA_RESERVATION_EXPIRED',
+    });
+    expect(dependencies.headObject).not.toHaveBeenCalled();
+  });
+
   test.each([
     [{bytes: 31, sha256: 'a'.repeat(64)}],
     [{bytes: 32, sha256: 'b'.repeat(64)}],

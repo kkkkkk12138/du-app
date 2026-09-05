@@ -117,6 +117,79 @@ test('requests a short-lived COS upload ticket through CloudBase', async () => {
   });
 });
 
+test('renews media reservations through CloudBase', async () => {
+  const callFunction = jest.fn().mockResolvedValue({
+    requestId: 'renew-request',
+    result: {
+      entryCommitId: 'commit-1',
+      expiresAt: 1_788_425_000_000,
+      media: [
+        {
+          id: 'reservation-1',
+          status: 'ticketed',
+          expiresAt: 1_788_425_000_000,
+        },
+        {
+          id: 'reservation-2',
+          status: 'verified',
+          expiresAt: 1_788_424_000_000,
+        },
+      ],
+    },
+  });
+  const gateway = createCloudBaseGateway(
+    configuredCloud,
+    () => ({callFunction}),
+  );
+
+  await expect(
+    gateway.renewMediaUpload({entryCommitId: 'commit-1'}),
+  ).resolves.toEqual({
+    entryCommitId: 'commit-1',
+    expiresAt: 1_788_425_000_000,
+    media: [
+      {
+        id: 'reservation-1',
+        status: 'ticketed',
+        expiresAt: 1_788_425_000_000,
+      },
+      {
+        id: 'reservation-2',
+        status: 'verified',
+        expiresAt: 1_788_424_000_000,
+      },
+    ],
+  });
+  expect(callFunction).toHaveBeenCalledWith({
+    name: 'media-renew-upload',
+    data: {entryCommitId: 'commit-1'},
+  });
+});
+
+test.each([
+  null,
+  {entryCommitId: '', expiresAt: 1, media: []},
+  {
+    entryCommitId: 'commit-1',
+    expiresAt: 1,
+    media: [{id: 'reservation-1', status: 'released', expiresAt: 1}],
+  },
+])('rejects an invalid media renewal result %#', async result => {
+  const gateway = createCloudBaseGateway(
+    configuredCloud,
+    () => ({
+      callFunction: jest.fn().mockResolvedValue({
+        requestId: 'renew-request',
+        result,
+      }),
+    }),
+  );
+
+  await expect(
+    gateway.renewMediaUpload({entryCommitId: 'commit-1'}),
+  ).rejects.toThrow('CloudBase 返回的媒体续期结果无效');
+});
+
 test('exposes the complete media reservation lifecycle', async () => {
   const callFunction = jest.fn(
     async <T>({name}: {name: string}): Promise<{

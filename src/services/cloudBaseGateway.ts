@@ -84,6 +84,16 @@ export type ReleaseMediaUploadInput = {
   reason: 'cancelled' | 'expired';
 };
 
+export type RenewedMediaUpload = {
+  entryCommitId: string;
+  expiresAt: number;
+  media: Array<{
+    id: string;
+    status: 'reserved' | 'ticketed' | 'verified';
+    expiresAt: number;
+  }>;
+};
+
 export type AccountKeyInitialization = {
   status: 'claimed' | 'existing' | 'recovery_required';
   keyVersion: 1;
@@ -131,6 +141,26 @@ function assertConfirmedUpload(upload: ConfirmedMediaUpload) {
     throw new Error('CloudBase 返回的媒体确认结果无效');
   }
   return upload;
+}
+
+function assertRenewedUpload(
+  renewal: RenewedMediaUpload,
+): RenewedMediaUpload {
+  if (
+    !renewal?.entryCommitId ||
+    !Number.isFinite(renewal.expiresAt) ||
+    !Array.isArray(renewal.media) ||
+    renewal.media.length === 0 ||
+    renewal.media.some(
+      item =>
+        !item?.id ||
+        !['reserved', 'ticketed', 'verified'].includes(item.status) ||
+        !Number.isFinite(item.expiresAt),
+    )
+  ) {
+    throw new Error('CloudBase 返回的媒体续期结果无效');
+  }
+  return renewal;
 }
 
 function assertAccountKeyInitialization(
@@ -196,6 +226,16 @@ export function createCloudBaseGateway(
         data: input,
       });
       return assertConfirmedUpload(response.result);
+    },
+
+    async renewMediaUpload(input: {
+      entryCommitId: string;
+    }): Promise<RenewedMediaUpload> {
+      const response = await app.callFunction<RenewedMediaUpload>({
+        name: 'media-renew-upload',
+        data: input,
+      });
+      return assertRenewedUpload(response.result);
     },
 
     async releaseMediaUpload(

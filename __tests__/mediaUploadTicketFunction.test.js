@@ -90,6 +90,26 @@ describe('media-create-upload-ticket', () => {
     expect(dependencies.signPutUrl).not.toHaveBeenCalled();
   });
 
+  test('returns MEDIA_RESERVATION_EXPIRED for an expired reservation', async () => {
+    const dependencies = createDependencies({
+      findReservation: jest.fn().mockResolvedValue({
+        id: 'reserve_01',
+        accountId: 'user_01',
+        mediaId: 'media_01',
+        bytes: 2_400_000,
+        sha256: 'a'.repeat(64),
+        status: 'reserved',
+        expiresAt: 1_200_000,
+      }),
+    });
+    const handler = createMediaUploadTicketHandler(dependencies);
+
+    await expect(handler(validEvent, {})).rejects.toMatchObject({
+      code: 'MEDIA_RESERVATION_EXPIRED',
+    });
+    expect(dependencies.signPutUrl).not.toHaveBeenCalled();
+  });
+
   test('returns a short-lived HTTPS PUT ticket for a valid reservation', async () => {
     const dependencies = createDependencies();
     const handler = createMediaUploadTicketHandler(dependencies);

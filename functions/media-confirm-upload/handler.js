@@ -1,5 +1,11 @@
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
+function createCodedError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 function parseEvent(event) {
   if (!SAFE_ID.test(event?.reservationId ?? '')) {
     throw new Error('媒体确认参数无效');
@@ -36,10 +42,15 @@ function createMediaConfirmUploadHandler({
         reservation,
       });
     }
+    if (reservation.expiresAt <= now()) {
+      throw createCodedError(
+        'MEDIA_RESERVATION_EXPIRED',
+        '媒体上传预留已过期',
+      );
+    }
     if (
       reservation.status !== 'ticketed' ||
-      !reservation.objectKey ||
-      reservation.expiresAt <= now()
+      !reservation.objectKey
     ) {
       throw new Error('媒体上传预留不可确认');
     }

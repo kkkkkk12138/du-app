@@ -3,6 +3,12 @@ const TICKET_TTL_SECONDS = 10 * 60;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 
+function createCodedError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
 function parseEvent(event) {
   const reservationId = event?.reservationId;
   const mediaId = event?.mediaId;
@@ -35,10 +41,15 @@ function assertReservation(reservation, input, accountId, now) {
     reservation.mediaId !== input.mediaId ||
     reservation.bytes !== input.bytes ||
     reservation.sha256 !== input.sha256 ||
-    !['reserved', 'ticketed'].includes(reservation.status) ||
-    reservation.expiresAt <= now
+    !['reserved', 'ticketed'].includes(reservation.status)
   ) {
     throw new Error('媒体上传预留无效');
+  }
+  if (reservation.expiresAt <= now) {
+    throw createCodedError(
+      'MEDIA_RESERVATION_EXPIRED',
+      '媒体上传预留已过期',
+    );
   }
 }
 
