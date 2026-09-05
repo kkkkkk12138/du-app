@@ -111,11 +111,17 @@ test('moves from email entry to the six-digit verification step', async () => {
 test('disables resend for thirty seconds and verifies the code', async () => {
   jest.useFakeTimers();
   const provider = createAuthProvider();
+  const initializeAccountMasterKey = jest
+    .fn()
+    .mockResolvedValue({status: 'unlocked'});
   let renderer!: ReactTestRenderer.ReactTestRenderer;
 
   act(() => {
     renderer = renderWithTheme(
-      <AccountAccessScreen authProvider={provider} />,
+      <AccountAccessScreen
+        authProvider={provider}
+        initializeAccountMasterKey={initializeAccountMasterKey}
+      />,
     );
   });
   act(() => {
@@ -148,6 +154,11 @@ test('disables resend for thirty seconds and verifies the code', async () => {
     expect.objectContaining({channel: 'email'}),
     '123456',
   );
+  expect(initializeAccountMasterKey).toHaveBeenCalledWith('account-1');
+  expect(useAccountStore.getState().account).toEqual({
+    status: 'signed_in_unlocked',
+    session,
+  });
   expect(mockReplace).toHaveBeenCalledWith('Account');
 
   act(() => renderer.unmount());
@@ -189,6 +200,49 @@ test('switches to phone verification without changing the account flow', async (
   expect(
     renderer.root.findByProps({accessibilityLabel: '六位验证码'}),
   ).toBeTruthy();
+
+  act(() => renderer.unmount());
+});
+
+test('keeps the verified account locked when key recovery is required', async () => {
+  const provider = createAuthProvider();
+  const initializeAccountMasterKey = jest
+    .fn()
+    .mockResolvedValue({status: 'recovery_required'});
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+
+  act(() => {
+    renderer = renderWithTheme(
+      <AccountAccessScreen
+        authProvider={provider}
+        initializeAccountMasterKey={initializeAccountMasterKey}
+      />,
+    );
+  });
+  act(() => {
+    renderer.root
+      .findByProps({accessibilityLabel: '邮箱地址'})
+      .props.onChangeText('person@example.com');
+  });
+  await act(async () => {
+    renderer.root
+      .findByProps({accessibilityLabel: '获取验证码'})
+      .props.onPress();
+  });
+  act(() => {
+    renderer.root
+      .findByProps({accessibilityLabel: '六位验证码'})
+      .props.onChangeText('123456');
+  });
+  await act(async () => {
+    renderer.root.findByProps({accessibilityLabel: '登录'}).props.onPress();
+  });
+
+  expect(useAccountStore.getState().account).toEqual({
+    status: 'signed_in_locked',
+    session,
+  });
+  expect(mockReplace).toHaveBeenCalledWith('Account');
 
   act(() => renderer.unmount());
 });

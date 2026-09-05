@@ -65,6 +65,32 @@ test('restores a signed-in account as locked without a local key', async () => {
   act(() => renderer.unmount());
 });
 
+test('keeps a restored account locked when key validation fails', async () => {
+  const {provider} = createAuthProvider(session);
+  const hasUnlockedAccountKey = jest
+    .fn()
+    .mockRejectedValue(new Error('network unavailable'));
+
+  let renderer: ReactTestRenderer.ReactTestRenderer;
+  await act(async () => {
+    renderer = ReactTestRenderer.create(
+      <AccountSessionBootstrap
+        authProvider={provider}
+        hasUnlockedAccountKey={hasUnlockedAccountKey}
+      >
+        <></>
+      </AccountSessionBootstrap>,
+    );
+  });
+
+  expect(useAccountStore.getState().account).toEqual({
+    status: 'signed_in_locked',
+    session,
+  });
+
+  act(() => renderer.unmount());
+});
+
 test('tracks auth changes and removes the listener on unmount', async () => {
   const {provider, emit, unsubscribe} = createAuthProvider(null);
   const hasUnlockedAccountKey = jest.fn().mockResolvedValue(true);

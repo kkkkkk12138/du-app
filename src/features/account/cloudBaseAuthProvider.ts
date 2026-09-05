@@ -1,7 +1,5 @@
-import cloudbase from '@cloudbase/js-sdk';
-
 import type {CloudBaseConfig} from '../../config/cloudServiceConfig';
-import {ensureCloudBaseReactNativeStorage} from '../../services/cloudBaseReactNativeStorage';
+import {getCloudBaseApp} from '../../services/cloudBaseApp';
 import type {AuthProvider} from './AuthProvider';
 import {toAccountAuthError} from './authErrors';
 import {
@@ -87,10 +85,11 @@ type CloudBaseAuthInitializer = (input: {
   region: CloudBaseConfig['region'];
 }) => CloudBaseAuthApp;
 
-const initializeCloudBaseAuth: CloudBaseAuthInitializer = input => {
-  ensureCloudBaseReactNativeStorage();
-  return cloudbase.init(input) as unknown as CloudBaseAuthApp;
-};
+const initializeCloudBaseAuth: CloudBaseAuthInitializer = input =>
+  getCloudBaseApp<CloudBaseAuthApp>({
+    envId: input.env,
+    region: input.region,
+  });
 
 function normalizeEmail(value: string) {
   const email = value.trim().toLowerCase();

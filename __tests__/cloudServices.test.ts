@@ -4,6 +4,7 @@ import {
   developmentCloudBaseConfig,
   type CloudBaseConfig,
 } from '../src/config/cloudServiceConfig';
+import {getCloudBaseApp} from '../src/services/cloudBaseApp';
 import {createCloudBaseGateway} from '../src/services/cloudBaseGateway';
 import {uploadEncryptedMedia} from '../src/services/cosObjectStorage';
 
@@ -50,6 +51,23 @@ test('keeps COS configuration separate from CloudBase', () => {
       bucket: ' du-media-test-1234567890 ',
     }),
   ).toEqual({bucket: 'du-media-test-1234567890'});
+});
+
+test('reuses one CloudBase app for auth and function calls', () => {
+  const app = {id: 'shared-app'};
+  const initialize = jest.fn().mockReturnValue(app);
+  const config = {
+    envId: 'du-shared-app-test',
+    region: 'ap-shanghai' as const,
+  };
+
+  expect(getCloudBaseApp(config, initialize)).toBe(app);
+  expect(getCloudBaseApp(config, initialize)).toBe(app);
+  expect(initialize).toHaveBeenCalledTimes(1);
+  expect(initialize).toHaveBeenCalledWith({
+    env: 'du-shared-app-test',
+    region: 'ap-shanghai',
+  });
 });
 
 test('requests a short-lived COS upload ticket through CloudBase', async () => {
@@ -261,4 +279,43 @@ test('rejects an insecure COS upload URL', async () => {
       },
     }),
   ).rejects.toThrow('COS 上传地址必须使用 HTTPS');
+});
+
+test('initializes the account encryption identity through CloudBase', async () => {
+  const callFunction = jest.fn().mockResolvedValue({
+    requestId: 'account-key-request',
+    result: {status: 'claimed', keyVersion: 1},
+  });
+  const gateway = createCloudBaseGateway(
+    configuredCloud,
+    () => ({callFunction}),
+  );
+
+  await expect(
+    gateway.initializeAccountKey({keyVerifier: 'a'.repeat(64)}),
+  ).resolves.toEqual({status: 'claimed', keyVersion: 1});
+  expect(callFunction).toHaveBeenCalledWith({
+    name: 'account-initialize-key',
+    data: {keyVerifier: 'a'.repeat(64)},
+  });
+});
+
+test.each([
+  {status: 'unknown', keyVersion: 1},
+  {status: 'existing', keyVersion: 2},
+  null,
+])('rejects an invalid account encryption result %#', async result => {
+  const gateway = createCloudBaseGateway(
+    configuredCloud,
+    () => ({
+      callFunction: jest.fn().mockResolvedValue({
+        requestId: 'account-key-request',
+        result,
+      }),
+    }),
+  );
+
+  await expect(
+    gateway.initializeAccountKey({keyVerifier: 'a'.repeat(64)}),
+  ).rejects.toThrow('CloudBase 返回的账号加密身份无效');
 });

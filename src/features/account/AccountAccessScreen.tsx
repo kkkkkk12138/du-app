@@ -30,15 +30,25 @@ import {
 import type {AuthProvider} from './AuthProvider';
 import {getAccountAuthProvider} from './accountAuthProvider';
 import type {VerificationChallenge} from './authTypes';
+import {
+  initializeAccountMasterKey as enrollAccountMasterKey,
+  type KeyRecoveryState,
+} from './keyRecoveryState';
 import {useAccountStore} from './useAccountStore';
 
 type Channel = 'email' | 'phone';
 
 type Props = {
   authProvider?: AuthProvider;
+  initializeAccountMasterKey?: (
+    uid: string,
+  ) => Promise<KeyRecoveryState>;
 };
 
-export function AccountAccessScreen({authProvider}: Props) {
+export function AccountAccessScreen({
+  authProvider,
+  initializeAccountMasterKey = enrollAccountMasterKey,
+}: Props) {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route =
@@ -115,7 +125,14 @@ export function AccountAccessScreen({authProvider}: Props) {
         challenge.channel === 'email'
           ? await provider.verifyEmailCode(challenge, code)
           : await provider.verifyPhoneCode(challenge, code);
-      useAccountStore.getState().setSignedIn(session, false);
+      let unlocked = false;
+      try {
+        const keyState = await initializeAccountMasterKey(session.uid);
+        unlocked = keyState.status === 'unlocked';
+      } catch {
+        unlocked = false;
+      }
+      useAccountStore.getState().setSignedIn(session, unlocked);
       navigation.replace('Account');
     } catch (verifyError) {
       setError(

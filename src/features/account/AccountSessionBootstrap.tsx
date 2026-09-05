@@ -38,7 +38,12 @@ export function AccountSessionBootstrap({
         return;
       }
 
-      const unlocked = await hasUnlockedAccountKey(session.uid);
+      let unlocked = false;
+      try {
+        unlocked = await hasUnlockedAccountKey(session.uid);
+      } catch {
+        unlocked = false;
+      }
       if (active) {
         setSignedIn(session, unlocked);
       }

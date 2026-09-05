@@ -1,6 +1,5 @@
-import cloudbase from '@cloudbase/js-sdk';
-
 import type {CloudBaseConfig} from '../config/cloudServiceConfig';
+import {getCloudBaseApp} from './cloudBaseApp';
 
 type CloudBaseRuntime = {
   callFunction: <T>(input: {
@@ -85,8 +84,16 @@ export type ReleaseMediaUploadInput = {
   reason: 'cancelled' | 'expired';
 };
 
+export type AccountKeyInitialization = {
+  status: 'claimed' | 'existing' | 'recovery_required';
+  keyVersion: 1;
+};
+
 const initializeCloudBase: CloudBaseInitializer = input =>
-  cloudbase.init(input) as unknown as CloudBaseRuntime;
+  getCloudBaseApp<CloudBaseRuntime>({
+    envId: input.env,
+    region: input.region,
+  });
 
 function assertUploadTicket(
   ticket: MediaUploadTicket,
@@ -126,6 +133,20 @@ function assertConfirmedUpload(upload: ConfirmedMediaUpload) {
   return upload;
 }
 
+function assertAccountKeyInitialization(
+  result: AccountKeyInitialization,
+) {
+  if (
+    !['claimed', 'existing', 'recovery_required'].includes(
+      result?.status,
+    ) ||
+    result.keyVersion !== 1
+  ) {
+    throw new Error('CloudBase 返回的账号加密身份无效');
+  }
+  return result;
+}
+
 export function createCloudBaseGateway(
   config: CloudBaseConfig,
   initialize: CloudBaseInitializer = initializeCloudBase,
@@ -136,6 +157,17 @@ export function createCloudBaseGateway(
   });
 
   return {
+    async initializeAccountKey(input: {
+      keyVerifier: string;
+    }): Promise<AccountKeyInitialization> {
+      const response =
+        await app.callFunction<AccountKeyInitialization>({
+          name: 'account-initialize-key',
+          data: input,
+        });
+      return assertAccountKeyInitialization(response.result);
+    },
+
     async reserveMediaUpload(
       input: MediaUploadReservationInput,
     ): Promise<MediaUploadReservation> {
