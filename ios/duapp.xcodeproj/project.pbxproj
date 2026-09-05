@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00E356E21AD99517003FC87E /* DuemCipherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00E356E11AD99517003FC87E /* DuemCipherTests.swift */; };
+		E30000000000000000000002 /* DuemCipher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000001 /* DuemCipher.swift */; };
+		E30000000000000000000004 /* DuMediaCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000003 /* DuMediaCrypto.swift */; };
+		E30000000000000000000006 /* DuMediaCryptoBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = E30000000000000000000005 /* DuMediaCryptoBridge.m */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -21,7 +25,22 @@
 		F8814D0058A043B28A8144BC /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F59AB32AC46443088B677582 /* BootSplash.storyboard */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		00E357031AD99517003FC87E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
+			remoteInfo = duapp;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		00E356E11AD99517003FC87E /* DuemCipherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuemCipherTests.swift; sourceTree = "<group>"; };
+		00E356EE1AD99517003FC87E /* duappTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = duappTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E30000000000000000000001 /* DuemCipher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DuemCipher.swift; path = duapp/DuemCipher.swift; sourceTree = "<group>"; };
+		E30000000000000000000003 /* DuMediaCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DuMediaCrypto.swift; path = duapp/DuMediaCrypto.swift; sourceTree = "<group>"; };
+		E30000000000000000000005 /* DuMediaCryptoBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DuMediaCryptoBridge.m; path = duapp/DuMediaCryptoBridge.m; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* duapp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = duapp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = duapp/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = duapp/Info.plist; sourceTree = "<group>"; };
@@ -42,6 +61,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		00E356EA1AD99517003FC87E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		13B07F8C1A680F5B00A75B9A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -53,6 +79,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		00E356EF1AD99517003FC87E /* duappTests */ = {
+			isa = PBXGroup;
+			children = (
+				00E356E11AD99517003FC87E /* DuemCipherTests.swift */,
+			);
+			path = duappTests;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* duapp */ = {
 			isa = PBXGroup;
 			children = (
@@ -63,6 +97,9 @@
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				D0F11E5A0000000000000001 /* DuFileShare.m */,
                                 D0F11E5A0000000000000003 /* DuGeocoder.m */,
+				E30000000000000000000001 /* DuemCipher.swift */,
+				E30000000000000000000003 /* DuMediaCrypto.swift */,
+				E30000000000000000000005 /* DuMediaCryptoBridge.m */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -92,6 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07FAE1A68108700A75B9A /* duapp */,
+				00E356EF1AD99517003FC87E /* duappTests */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
@@ -106,6 +144,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* duapp.app */,
+				00E356EE1AD99517003FC87E /* duappTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -122,6 +161,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		00E356ED1AD99517003FC87E /* duappTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "duappTests" */;
+			buildPhases = (
+				00E356EB1AD99517003FC87E /* Sources */,
+				00E356EA1AD99517003FC87E /* Frameworks */,
+				00E356EC1AD99517003FC87E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				00E357041AD99517003FC87E /* PBXTargetDependency */,
+			);
+			name = duappTests;
+			productName = duappTests;
+			productReference = 00E356EE1AD99517003FC87E /* duappTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		13B07F861A680F5B00A75B9A /* duapp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "duapp" */;
@@ -151,6 +208,10 @@
 			attributes = {
 				LastUpgradeCheck = 1210;
 				TargetAttributes = {
+					00E356ED1AD99517003FC87E = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 13B07F861A680F5B00A75B9A;
+					};
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1120;
 					};
@@ -170,11 +231,19 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* duapp */,
+				00E356ED1AD99517003FC87E /* duappTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		00E356EC1AD99517003FC87E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		13B07F8E1A680F5B00A75B9A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -268,6 +337,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		00E356EB1AD99517003FC87E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				00E356E21AD99517003FC87E /* DuemCipherTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		13B07F871A680F5B00A75B9A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -275,12 +352,66 @@
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				D0F11E5A0000000000000002 /* DuFileShare.m in Sources */,
                                 D0F11E5A0000000000000004 /* DuGeocoder.m in Sources */,
+				E30000000000000000000002 /* DuemCipher.swift in Sources */,
+				E30000000000000000000004 /* DuMediaCrypto.swift in Sources */,
+				E30000000000000000000006 /* DuMediaCryptoBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		00E357041AD99517003FC87E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 13B07F861A680F5B00A75B9A /* duapp */;
+			targetProxy = 00E357031AD99517003FC87E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		00E357001AD99517003FC87E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-duapp.debug.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.reactjs.native.example.duappTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/duapp.app/duapp";
+			};
+			name = Debug;
+		};
+		00E357011AD99517003FC87E /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-duapp.release.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.reactjs.native.example.duappTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/duapp.app/duapp";
+			};
+			name = Release;
+		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-duapp.debug.xcconfig */;
@@ -534,6 +665,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "duappTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00E357001AD99517003FC87E /* Debug */,
+				00E357011AD99517003FC87E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "duapp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

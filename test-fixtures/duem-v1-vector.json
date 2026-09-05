@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "keyBase64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "uid": "test-user",
+  "entryCommitId": "test-commit",
+  "mediaId": "test-media",
+  "mediaKind": "photo",
+  "chunkSize": 16,
+  "plaintextBase64": "RFVFTSB2MSBmaXhlZCB2ZWN0b3IgY3Jvc3NlcyBzZXZlcmFsIGF1dGhlbnRpY2F0ZWQgY2h1bmtzLg==",
+  "saltHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "noncePrefixHex": "a0a1a2a3a4a5a6a7",
+  "encryptedBase64": "RFVFTQEBAAAAEAAAAAAAAAA6AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh+goaKjpKWmpwAAABBAFZUa6jcNOTZMsa1UQMhaqjrNoH5UzNMyBaQKRrFqRQAAABAV8Rb5rcLWoVofaa9NcWjeLEQd5NLOEafTdvFLFZxaLQAAABA8DX34wz5/DDbOq4x83kpDeUOc+C0YE0VD9mZZH1fE3gAAAAqEzHHkxyeqiRVC7g6kTGSiijVh5hK71ipjXQ==",
+  "sha256": "1344b190f4b73d2cc4246c89fd88615be879d8b98829d91fd62cc2c1d91791d7",
+  "keyVerifier": "4c0d0da3db79f8ecc345b1c0b875caa303b4ac36bfadbbdbcb0e983f4667d74a"
+}
