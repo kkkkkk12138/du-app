@@ -52,6 +52,16 @@
       "timeout": 10,
       "memorySize": 256,
       "installDependency": true
+    },
+    {
+      "name": "account-initialize-key",
+      "description": "Claim the first encryption identity for an account",
+      "type": "Event",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true
     }
   ],
   "database": {

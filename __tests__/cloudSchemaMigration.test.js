@@ -36,6 +36,13 @@ const releaseUploadMigrationPath = path.join(
   'migrations',
   '20260904073000_release_media_reservations.sql',
 );
+const accountEncryptionIdentityMigrationPath = path.join(
+  __dirname,
+  '..',
+  'cloudbase',
+  'migrations',
+  '20260904074000_claim_account_encryption_identity.sql',
+);
 const migrationsDirectory = path.dirname(migrationPath);
 
 describe('CloudBase account, sync, and billing schema', () => {
@@ -186,5 +193,36 @@ describe('CloudBase account, sync, and billing schema', () => {
     expect(sql).toContain(
       'REVOKE ALL ON FUNCTION public.release_media_reservation',
     );
+  });
+
+  test('claims one server-owned encryption identity per account', () => {
+    const sql = fs.readFileSync(
+      accountEncryptionIdentityMigrationPath,
+      'utf8',
+    );
+
+    expect(sql).toContain(
+      'CREATE TABLE public.account_encryption_identities',
+    );
+    expect(sql).toContain(
+      'CREATE FUNCTION public.claim_account_encryption_identity',
+    );
+    expect(sql).toContain(
+      'ALTER TABLE public.account_encryption_identities ENABLE ROW LEVEL SECURITY',
+    );
+    expect(sql).toContain(
+      'REVOKE ALL ON public.account_encryption_identities FROM anon, authenticated',
+    );
+    expect(sql).toContain('FOR UPDATE');
+    expect(sql).toContain('account_key_envelopes');
+    expect(sql).toContain('sync_records');
+    expect(sql).toContain('media_objects');
+    expect(sql).toContain("'claimed'");
+    expect(sql).toContain("'existing'");
+    expect(sql).toContain("'recovery_required'");
+    expect(sql).toContain(
+      'REVOKE ALL ON FUNCTION public.claim_account_encryption_identity',
+    );
+    expect(sql).toContain('TO service_role');
   });
 });
