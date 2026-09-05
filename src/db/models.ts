@@ -1,6 +1,11 @@
 import { Model } from '@nozbe/watermelondb';
 import { date, field, text } from '@nozbe/watermelondb/decorators';
 
+import type {
+  UploadItemState,
+  UploadJobState,
+} from '../features/billing/uploadOutboxTypes';
+
 export class User extends Model {
   static table = 'users';
 
@@ -79,6 +84,8 @@ export class Letter extends Model {
   @text('status') status!: string;
   @date('opened_at') openedAt?: Date;
   @field('reply_memory_id') replyMemoryId?: string;
+  @field('notification_status') notificationStatus?: string;
+  @field('notification_id') notificationId?: string;
 }
 
 export class Setting extends Model {
@@ -258,6 +265,44 @@ export class Scrap extends Model {
   @date('deleted_at') deletedAt?: Date;
 }
 
+export class MediaUploadJob extends Model {
+  static table = 'media_upload_jobs';
+
+  @text('entry_commit_id') entryCommitId!: string;
+  @text('entry_type') entryType!: string;
+  @text('local_entry_id') localEntryId!: string;
+  @field('letter_id') letterId?: string;
+  @text('account_uid') accountUid!: string;
+  @text('state') state!: UploadJobState;
+  @field('attempt_count') attemptCount!: number;
+  @date('next_attempt_at') nextAttemptAt?: Date;
+  @field('lease_owner') leaseOwner?: string;
+  @date('lease_expires_at') leaseExpiresAt?: Date;
+  @date('reservation_expires_at') reservationExpiresAt?: Date;
+  @field('last_error_code') lastErrorCode?: string;
+  @date('created_at') createdAt!: Date;
+  @date('updated_at') updatedAt!: Date;
+  @date('confirmed_at') confirmedAt?: Date;
+}
+
+export class MediaUploadItem extends Model {
+  static table = 'media_upload_items';
+
+  @text('job_id') jobId!: string;
+  @text('media_id') mediaId!: string;
+  @text('media_kind') mediaKind!: string;
+  @text('source_path') sourcePath!: string;
+  @field('plaintext_bytes') plaintextBytes!: number;
+  @field('encrypted_path') encryptedPath?: string;
+  @field('encrypted_bytes') encryptedBytes?: number;
+  @field('sha256') sha256?: string;
+  @field('reservation_id') reservationId?: string;
+  @field('object_key') objectKey?: string;
+  @text('state') state!: UploadItemState;
+  @date('created_at') createdAt!: Date;
+  @date('updated_at') updatedAt!: Date;
+}
+
 export const modelClasses = [
   User,
   Memory,
@@ -275,4 +320,6 @@ export const modelClasses = [
   Book,
   BookPage,
   Scrap,
+  MediaUploadJob,
+  MediaUploadItem,
 ];

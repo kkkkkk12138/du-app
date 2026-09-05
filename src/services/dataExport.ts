@@ -3,6 +3,7 @@ import { NativeModules } from 'react-native';
 import RNFS from 'react-native-fs';
 
 import { database } from '../db/database';
+import {schema} from '../db/schema';
 import {
   Book,
   CollagePage,
@@ -53,7 +54,7 @@ export type BackupAsset = {
 export type FullBackupManifest = {
   format: 'du-local-backup';
   version: 1;
-  schemaVersion: 14;
+  schemaVersion: number;
   exportedAt: string;
   tables: Record<BackupTable, BackupRawRecord[]>;
   assets: BackupAsset[];
@@ -356,7 +357,7 @@ export async function createFullBackupFile() {
     const manifest: FullBackupManifest = {
       format: 'du-local-backup',
       version: 1,
-      schemaVersion: 14,
+      schemaVersion: schema.version,
       exportedAt: new Date().toISOString(),
       tables: rawTables,
       assets,

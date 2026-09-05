@@ -21,11 +21,11 @@ function tableData() {
   return Object.fromEntries(tables.map(table => [table, []]));
 }
 
-function manifest() {
+function manifest(schemaVersion = 11) {
   return {
     format: 'du-local-backup',
     version: 1,
-    schemaVersion: 11,
+    schemaVersion,
     exportedAt: '2026-08-05T08:00:00.000Z',
     tables: {
       ...tableData(),
@@ -233,6 +233,17 @@ test('previews a validated backup before destructive restore', async () => {
   });
 });
 
+test.each([14, 15])(
+  'accepts schema %s backups across the outbox migration',
+  async schemaVersion => {
+    mockFileContents['/import.json'] = JSON.stringify(
+      manifest(schemaVersion),
+    );
+
+    await expect(pickAndInspectBackup()).resolves.toBeDefined();
+  },
+);
+
 test('rejects unsupported or corrupted backup content', async () => {
   mockFileContents['/import.json'] = JSON.stringify({
     ...manifest(),
@@ -272,6 +283,10 @@ test('restores assets and remaps imported content to the device identity', async
     ]),
   });
   expect(prepared.memories[0].image_path).toBe('/restored/memory-1-photo.jpg');
+  expect(prepared.letters[0]).toMatchObject({
+    notification_status: null,
+    notification_id: null,
+  });
   expect(result.duNumber).toBe('123456');
 });
 

@@ -4,6 +4,7 @@ import RNFS from 'react-native-fs';
 
 import { database } from '../db/database';
 import { Book, CollagePage, Memory, User } from '../db/models';
+import {schema} from '../db/schema';
 import {
   backupTables,
   BackupAsset,
@@ -14,7 +15,7 @@ import {
 } from './dataExport';
 import { removeMediaFile, writeRestoredMediaFile } from './mediaStorage';
 
-const currentSchemaVersion = 14;
+const currentSchemaVersion = schema.version;
 const maximumBackupBytes = 300 * 1024 * 1024;
 const maximumRecords = 100000;
 const maximumAssets = 5000;
@@ -109,7 +110,7 @@ async function readAndValidateBackup(path: string): Promise<PreparedBackup> {
     !isObject(parsed) ||
     parsed.format !== 'du-local-backup' ||
     parsed.version !== 1 ||
-    ![11, 12, 13, currentSchemaVersion].includes(
+    ![11, 12, 13, 14, currentSchemaVersion].includes(
       Number(parsed.schemaVersion),
     ) ||
     !isObject(parsed.tables) ||
@@ -135,6 +136,12 @@ async function readAndValidateBackup(path: string): Promise<PreparedBackup> {
     (parsedTables.places as BackupRawRecord[]).forEach(record => {
       record.region ??= null;
       record.country_code ??= null;
+    });
+  }
+  if (Number(parsed.schemaVersion) < 15) {
+    (parsedTables.letters as BackupRawRecord[]).forEach(record => {
+      record.notification_status ??= null;
+      record.notification_id ??= null;
     });
   }
   backupTables.forEach(table => validateRawRecords(table, parsedTables[table]));

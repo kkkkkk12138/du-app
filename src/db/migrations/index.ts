@@ -309,5 +309,80 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 15,
+      steps: [
+        addColumns({
+          table: 'letters',
+          columns: [
+            {
+              name: 'notification_status',
+              type: 'string',
+              isOptional: true,
+            },
+            {
+              name: 'notification_id',
+              type: 'string',
+              isOptional: true,
+            },
+          ],
+        }),
+        createTable({
+          name: 'media_upload_jobs',
+          columns: [
+            {name: 'entry_commit_id', type: 'string', isIndexed: true},
+            {name: 'entry_type', type: 'string'},
+            {name: 'local_entry_id', type: 'string', isIndexed: true},
+            {name: 'letter_id', type: 'string', isOptional: true},
+            {name: 'account_uid', type: 'string', isIndexed: true},
+            {name: 'state', type: 'string', isIndexed: true},
+            {name: 'attempt_count', type: 'number'},
+            {
+              name: 'next_attempt_at',
+              type: 'number',
+              isOptional: true,
+              isIndexed: true,
+            },
+            {name: 'lease_owner', type: 'string', isOptional: true},
+            {
+              name: 'lease_expires_at',
+              type: 'number',
+              isOptional: true,
+            },
+            {
+              name: 'reservation_expires_at',
+              type: 'number',
+              isOptional: true,
+            },
+            {
+              name: 'last_error_code',
+              type: 'string',
+              isOptional: true,
+            },
+            {name: 'created_at', type: 'number'},
+            {name: 'updated_at', type: 'number'},
+            {name: 'confirmed_at', type: 'number', isOptional: true},
+          ],
+        }),
+        createTable({
+          name: 'media_upload_items',
+          columns: [
+            {name: 'job_id', type: 'string', isIndexed: true},
+            {name: 'media_id', type: 'string'},
+            {name: 'media_kind', type: 'string'},
+            {name: 'source_path', type: 'string'},
+            {name: 'plaintext_bytes', type: 'number'},
+            {name: 'encrypted_path', type: 'string', isOptional: true},
+            {name: 'encrypted_bytes', type: 'number', isOptional: true},
+            {name: 'sha256', type: 'string', isOptional: true},
+            {name: 'reservation_id', type: 'string', isOptional: true},
+            {name: 'object_key', type: 'string', isOptional: true},
+            {name: 'state', type: 'string', isIndexed: true},
+            {name: 'created_at', type: 'number'},
+            {name: 'updated_at', type: 'number'},
+          ],
+        }),
+      ],
+    },
   ],
 });
