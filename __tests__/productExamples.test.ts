@@ -15,6 +15,13 @@ let mockInstalledVersion: number | undefined;
 
 jest.mock('../src/db/database', () => ({
   database: {
+    adapter: {
+      getDeletedRecords: jest.fn(async (table: string) =>
+        mockCollections[table]
+          .filter(record => record._raw?._status === 'deleted')
+          .map(record => record.id),
+      ),
+    },
     localStorage: {
       get: jest.fn(async () => mockInstalledVersion),
       set: jest.fn(async (_key: unknown, value: number) => {
@@ -24,7 +31,11 @@ jest.mock('../src/db/database', () => ({
     write: jest.fn((work: () => unknown) => work()),
     get: jest.fn((table: string) => ({
       query: jest.fn(() => ({
-        fetch: jest.fn().mockResolvedValue(mockCollections[table]),
+        fetch: jest.fn(async () =>
+          mockCollections[table].filter(
+            record => record._raw?._status !== 'deleted',
+          ),
+        ),
       })),
       create: jest.fn(async (initialize: (record: any) => void) => {
         const record: any = { _raw: {} };
@@ -103,6 +114,34 @@ test('seeds a complete, clearly identified and deletable example set once', asyn
   expect(mockCollections.memories).toHaveLength(
     productExampleManifest.memories,
   );
+});
+
+test('repairs a lost seed marker without rebuilding complete examples', async () => {
+  const now = new Date(2026, 7, 5, 10, 30);
+  await seedProductExamples('user-1', now);
+  const initialCounts = Object.fromEntries(
+    Object.entries(mockCollections).map(([table, records]) => [
+      table,
+      records.length,
+    ]),
+  );
+  const initialPlace = mockCollections.places.find(
+    place => place.id === 'example-place-hangzhou',
+  );
+  initialPlace._raw._status = 'deleted';
+  mockInstalledVersion = undefined;
+
+  await expect(seedProductExamples('user-1', now)).resolves.toBe(false);
+
+  expect(
+    Object.fromEntries(
+      Object.entries(mockCollections).map(([table, records]) => [
+        table,
+        records.length,
+      ]),
+    ),
+  ).toEqual(initialCounts);
+  expect(mockInstalledVersion).toBe(6);
 });
 
 test('recognizes legacy development seeds as examples too', () => {

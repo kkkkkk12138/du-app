@@ -155,7 +155,42 @@ export async function seedDevelopmentData() {
 
   await database.write(async () => {
     if (!installedVersion) {
+      const [
+        existingPlaces,
+        existingMemories,
+        existingLetters,
+        existingTags,
+        deletedPlaceIds,
+        deletedMemoryIds,
+        deletedLetterIds,
+      ] = await Promise.all([
+        database.get<Place>('places').query().fetch(),
+        database.get<Memory>('memories').query().fetch(),
+        database.get<Letter>('letters').query().fetch(),
+        database.get<Tag>('tags').query().fetch(),
+        database.adapter.getDeletedRecords('places'),
+        database.adapter.getDeletedRecords('memories'),
+        database.adapter.getDeletedRecords('letters'),
+      ]);
+      const existingPlaceIds = new Set(
+        existingPlaces.map(record => record.id).concat(deletedPlaceIds),
+      );
+      const existingMemoryIds = new Set(
+        existingMemories.map(record => record.id).concat(deletedMemoryIds),
+      );
+      const existingLetterIds = new Set(
+        existingLetters.map(record => record.id).concat(deletedLetterIds),
+      );
+      const existingTagKeys = new Set(
+        existingTags.map(
+          record => `${record.category}:${record.text}`,
+        ),
+      );
+
       for (const item of places) {
+        if (existingPlaceIds.has(item.id)) {
+          continue;
+        }
         await database.get<Place>('places').create(place => {
           place._raw.id = item.id;
           place.name = item.name;
@@ -175,6 +210,9 @@ export async function seedDevelopmentData() {
       for (const item of memories.filter(
         memory => memory.id === 'seed-memory-letter',
       )) {
+        if (existingMemoryIds.has(item.id)) {
+          continue;
+        }
         await database.get<Memory>('memories').create(memory => {
           const timestamp = toTimestamp(item.writtenAt) ?? Date.now();
           memory._raw.id = item.id;
@@ -199,18 +237,23 @@ export async function seedDevelopmentData() {
         });
       }
 
-      await database.get<Letter>('letters').create(letter => {
-        letter._raw.id = 'seed-letter-one-year';
-        letter.memoryId = 'seed-memory-letter';
-        letter.sentAt = new Date('2025-03-15T20:00:00+08:00');
-        letter.arriveDate = new Date('2026-03-15T00:00:00+08:00');
-        letter.arriveType = 'one_year';
-        letter.toType = 'future_self';
-        letter.toName = '一年后的自己';
-        letter.status = 'arrived';
-      });
+      if (!existingLetterIds.has('seed-letter-one-year')) {
+        await database.get<Letter>('letters').create(letter => {
+          letter._raw.id = 'seed-letter-one-year';
+          letter.memoryId = 'seed-memory-letter';
+          letter.sentAt = new Date('2025-03-15T20:00:00+08:00');
+          letter.arriveDate = new Date('2026-03-15T00:00:00+08:00');
+          letter.arriveType = 'one_year';
+          letter.toType = 'future_self';
+          letter.toName = '一年后的自己';
+          letter.status = 'arrived';
+        });
+      }
 
       for (const [category, text, colorHex, seasonHint] of tags) {
+        if (existingTagKeys.has(`${category}:${text}`)) {
+          continue;
+        }
         await database.get<Tag>('tags').create(tag => {
           tag.category = category;
           tag.text = text;

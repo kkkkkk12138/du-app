@@ -479,12 +479,45 @@ async function updateVersionSixExampleTone(now: Date) {
   });
 }
 
+async function hasCompletedProductExampleSeed() {
+  const [places, books, deletedPlaceIds, deletedBookIds] =
+    await Promise.all([
+      database.get<Place>('places').query().fetch(),
+      database.get<Book>('books').query().fetch(),
+      database.adapter.getDeletedRecords('places'),
+      database.adapter.getDeletedRecords('books'),
+    ]);
+  const placeIds = new Set(
+    places.map(record => record.id).concat(deletedPlaceIds),
+  );
+  const bookIds = new Set(
+    books.map(record => record.id).concat(deletedBookIds),
+  );
+
+  return (
+    placeIds.has('example-place-hangzhou') &&
+    placeIds.has('example-place-harbin') &&
+    bookIds.has('example-book-v4-1')
+  );
+}
+
 export async function seedProductExamples(userId: string, now = new Date()) {
   const installedVersion = await database.localStorage.get(
     productExamplesSeededKey,
   );
   const installedVersionNumber = Number(installedVersion ?? 0);
   if (installedVersionNumber >= productExamplesVersion) {
+    return false;
+  }
+  if (
+    installedVersionNumber === 0 &&
+    (await hasCompletedProductExampleSeed())
+  ) {
+    await updateVersionSixExampleTone(now);
+    await database.localStorage.set(
+      productExamplesSeededKey,
+      productExamplesVersion,
+    );
     return false;
   }
   if (installedVersionNumber === 5) {
